@@ -15,7 +15,7 @@ struct r_dyn_list_of {
 
   // private:
   r_ssize width;
-  enum r_type type;
+  r_type type;
   r_ssize elt_byte_size;
 
   r_obj* reserve;
@@ -30,7 +30,7 @@ struct r_dyn_list_of {
   struct r_dyn_array* p_arrays;
 };
 
-struct r_dyn_list_of* r_new_dyn_list_of(enum r_type type,
+struct r_dyn_list_of* r_new_dyn_list_of(r_type type,
                                         r_ssize capacity,
                                         r_ssize width);
 

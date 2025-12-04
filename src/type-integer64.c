@@ -10,7 +10,7 @@ const char* v_integer64_proxy_df_names_c_strings[] = {
   "right"
 };
 static
-const enum r_type v_integer64_proxy_df_types[] = {
+const r_type v_integer64_proxy_df_types[] = {
   R_TYPE_double,
   R_TYPE_double
 };

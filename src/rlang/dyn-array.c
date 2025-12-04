@@ -7,7 +7,7 @@ static
 r_obj* attribs_dyn_array = NULL;
 
 
-struct r_dyn_array* r_new_dyn_vector(enum r_type type,
+struct r_dyn_array* r_new_dyn_vector(r_type type,
                                      r_ssize capacity) {
   r_obj* shelter = KEEP(r_alloc_list(2));
   r_poke_attrib(shelter, attribs_dyn_array);
@@ -84,7 +84,7 @@ void r_dyn_push_back(struct r_dyn_array* p_arr,
 
 void r_dyn_resize(struct r_dyn_array* p_arr,
                   r_ssize capacity) {
-  enum r_type type = p_arr->type;
+  r_type type = p_arr->type;
 
   r_ssize capacity_multiplier = p_arr->type == R_TYPE_raw ?
     r_ssize_mult(p_arr->elt_byte_size, capacity) :

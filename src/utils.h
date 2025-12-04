@@ -361,7 +361,11 @@ static inline const void* vec_type_missing_value(enum vctrs_type type) {
   case VCTRS_TYPE_double: return &NA_REAL;
   case VCTRS_TYPE_complex: return &vctrs_shared_na_cpl;
   case VCTRS_TYPE_character: return &NA_STRING;
+#ifdef CXXR_PROJECT
+  case VCTRS_TYPE_list: return R_NilValue;
+#else
   case VCTRS_TYPE_list: return &R_NilValue;
+#endif
   default: stop_unimplemented_vctrs_type("vec_type_missing_value", type);
   }
 }

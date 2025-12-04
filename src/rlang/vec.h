@@ -59,7 +59,7 @@ r_obj* const * r_list_cbegin(r_obj* x) {
 }
 
 static inline
-void* r_vec_begin0(enum r_type type, r_obj* x) {
+void* r_vec_begin0(r_type type, r_obj* x) {
   switch (type) {
   case R_TYPE_logical: return r_lgl_begin(x);
   case R_TYPE_integer: return r_int_begin(x);
@@ -75,7 +75,7 @@ void* r_vec_begin(r_obj* x) {
 }
 
 static inline
-const void* r_vec_cbegin0(enum r_type type, r_obj* x) {
+const void* r_vec_cbegin0(r_type type, r_obj* x) {
   switch (type) {
   case R_TYPE_logical: return r_lgl_cbegin(x);
   case R_TYPE_integer: return r_int_cbegin(x);
@@ -93,7 +93,7 @@ const void* r_vec_cbegin(r_obj* x) {
 }
 
 static inline
-int r_vec_elt_sizeof0(enum r_type type) {
+int r_vec_elt_sizeof0(r_type type) {
   switch (type) {
   case R_TYPE_logical: return sizeof(int);
   case R_TYPE_integer: return sizeof(int);
@@ -176,7 +176,7 @@ void r_list_poke(r_obj* x, r_ssize i, r_obj* y) {
 #define r_list_poke(X, I, Y) SET_VECTOR_ELT(X, I, Y)
 
 static inline
-r_obj* r_alloc_vector(enum r_type type, r_ssize n) {
+r_obj* r_alloc_vector(r_type type, r_ssize n) {
   return Rf_allocVector(type, n);
 }
 static inline
@@ -406,7 +406,7 @@ r_obj* r_chr_resize(r_obj* x, r_ssize size);
 r_obj* r_list_resize(r_obj* x, r_ssize size);
 
 static inline
-r_obj* r_vec_resize0(enum r_type type, r_obj* x, r_ssize size) {
+r_obj* r_vec_resize0(r_type type, r_obj* x, r_ssize size) {
   switch (type) {
   case R_TYPE_logical: return r_lgl_resize(x, size);
   case R_TYPE_integer: return r_int_resize(x, size);
@@ -424,7 +424,7 @@ r_obj* r_vec_resize(r_obj* x, r_ssize size) {
 }
 
 static inline
-r_obj* r_vec_n(enum r_type type, void* v_src, r_ssize n) {
+r_obj* r_vec_n(r_type type, void* v_src, r_ssize n) {
   switch (type) {
   case R_TYPE_logical:
   case R_TYPE_integer:
@@ -487,7 +487,7 @@ void r_int_fill_iota(r_obj* x) {
 r_obj* r_list_compact(r_obj* x);
 
 r_obj* r_list_of_as_ptr_ssize(r_obj* xs,
-                              enum r_type type,
+                              r_type type,
                               struct r_pair_ptr_ssize** p_v_out);
 
 

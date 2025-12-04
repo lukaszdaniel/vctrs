@@ -17,7 +17,7 @@ enum shelter_dyn_list_of {
   SHELTER_DYN_LOF_SIZE
 };
 
-struct r_dyn_list_of* r_new_dyn_list_of(enum r_type type,
+struct r_dyn_list_of* r_new_dyn_list_of(r_type type,
                                         r_ssize capacity,
                                         r_ssize width) {
   switch (type) {
@@ -84,7 +84,7 @@ struct r_dyn_list_of* r_new_dyn_list_of(enum r_type type,
 r_obj* r_lof_unwrap(struct r_dyn_list_of* p_lof) {
   r_obj* out = KEEP(r_alloc_list(p_lof->count));
 
-  enum r_type type = p_lof->type;
+  r_type type = p_lof->type;
   r_ssize n = p_lof->count;
   struct r_pair_ptr_ssize* v_arrays = r_dyn_begin(p_lof->p_arrays);
 

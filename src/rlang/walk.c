@@ -21,7 +21,7 @@ enum sexp_iterator_state {
 
 struct sexp_stack_info {
   r_obj* x;
-  enum r_type type;
+  r_type type;
 
   const enum sexp_iterator_state* p_state;
   r_obj* const * v_arr;
@@ -78,7 +78,7 @@ struct r_sexp_iterator* r_new_sexp_iterator(r_obj* root) {
   struct r_dyn_array* p_stack = r_new_dyn_array(sizeof(struct sexp_stack_info), SEXP_STACK_INIT_SIZE);
   r_list_poke(shelter, 1, p_stack->shelter);
 
-  enum r_type type = r_typeof(root);
+  r_type type = r_typeof(root);
   enum sexp_iterator_type it_type = sexp_iterator_type(type, root);
   bool has_attrib = sexp_node_attrib(type, root) != r_null;
 
@@ -173,7 +173,7 @@ bool sexp_next_incoming(struct r_sexp_iterator* p_it,
                         struct sexp_stack_info* p_info) {
   enum sexp_iterator_state state = *p_info->p_state;
   r_obj* x = p_info->x;
-  enum r_type type = p_info->type;
+  r_type type = p_info->type;
 
   struct sexp_stack_info child = { 0 };
   child.parent = x;
@@ -276,7 +276,7 @@ void init_incoming_stack_info(struct sexp_stack_info* p_info,
 }
 
 static inline
-enum sexp_iterator_type sexp_iterator_type(enum r_type type,
+enum sexp_iterator_type sexp_iterator_type(r_type type,
                                            r_obj* x) {
   switch (type) {
   case R_TYPE_closure:
@@ -301,7 +301,7 @@ enum sexp_iterator_type sexp_iterator_type(enum r_type type,
   }
 }
 static inline
-r_obj* sexp_node_attrib(enum r_type type, r_obj* x) {
+r_obj* sexp_node_attrib(r_type type, r_obj* x) {
   // Strings have private data stored in attributes
   if (type == R_TYPE_string) {
     return r_null;
@@ -310,7 +310,7 @@ r_obj* sexp_node_attrib(enum r_type type, r_obj* x) {
   }
 }
 static inline
-r_obj* sexp_node_car(enum r_type type,
+r_obj* sexp_node_car(r_type type,
                      r_obj* x,
                      enum r_sexp_it_relation* p_rel) {
   switch (type) {
@@ -325,7 +325,7 @@ r_obj* sexp_node_car(enum r_type type,
   }
 }
 static inline
-r_obj* sexp_node_cdr(enum r_type type,
+r_obj* sexp_node_cdr(r_type type,
                      r_obj* x,
                      enum r_sexp_it_relation* p_rel) {
   switch (type) {
@@ -340,7 +340,7 @@ r_obj* sexp_node_cdr(enum r_type type,
   }
 }
 static inline
-r_obj* sexp_node_tag(enum r_type type,
+r_obj* sexp_node_tag(r_type type,
                      r_obj* x,
                      enum r_sexp_it_relation* p_rel) {
   switch (type) {

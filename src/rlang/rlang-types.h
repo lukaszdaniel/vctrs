@@ -33,7 +33,8 @@ typedef R_xlen_t r_ssize;
 # define R_PRI_SSIZE "d"
 #endif
 
-enum r_type {
+#ifndef CXXR_PROJECT
+enum r_type_t {
   R_TYPE_null        = 0,
   R_TYPE_symbol      = 1,
   R_TYPE_pairlist    = 2,
@@ -64,6 +65,37 @@ enum r_type {
 
   R_TYPE_function    = 99
 };
+typedef enum r_type_t r_type;
+#else
+#define r_type SEXPTYPE
+#define R_TYPE_null NILSXP
+#define R_TYPE_symbol SYMSXP
+#define R_TYPE_pairlist LISTSXP
+#define R_TYPE_closure CLOSXP
+#define R_TYPE_environment ENVSXP
+#define R_TYPE_promise PROMSXP
+#define R_TYPE_call LANGSXP
+#define R_TYPE_special SPECIALSXP
+#define R_TYPE_builtin BUILTINSXP
+#define R_TYPE_string CHARSXP
+#define R_TYPE_logical LGLSXP
+#define R_TYPE_integer INTSXP
+#define R_TYPE_double REALSXP
+#define R_TYPE_complex CPLXSXP
+#define R_TYPE_character STRSXP
+#define R_TYPE_dots DOTSXP
+#define R_TYPE_any ANYSXP
+#define R_TYPE_list VECSXP
+#define R_TYPE_expression EXPRSXP
+#define R_TYPE_bytecode BCODESXP
+#define R_TYPE_pointer EXTPTRSXP
+#define R_TYPE_weakref WEAKREFSXP
+#define R_TYPE_raw RAWSXP
+#define R_TYPE_s4 S4SXP
+#define R_TYPE_new NEWSXP
+#define R_TYPE_free FREESXP
+#define R_TYPE_function FUNSXP
+#endif
 
 #define r_null R_NilValue
 

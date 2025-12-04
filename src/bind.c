@@ -154,7 +154,7 @@ r_obj* vec_rbind(r_obj* xs,
   ++n_prot;
 
   r_obj* names_to_col = r_null;
-  enum r_type names_to_type = 99;
+  r_type names_to_type = R_TYPE_function;
   void* p_names_to_col = NULL;
   const void* p_index = NULL;
 

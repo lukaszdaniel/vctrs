@@ -1,22 +1,22 @@
 static inline
-enum sexp_iterator_type sexp_iterator_type(enum r_type type,
+enum sexp_iterator_type sexp_iterator_type(r_type type,
                                            r_obj* x);
 
 static inline
-r_obj* sexp_node_attrib(enum r_type type, r_obj* x);
+r_obj* sexp_node_attrib(r_type type, r_obj* x);
 
 static inline
-r_obj* sexp_node_car(enum r_type type,
+r_obj* sexp_node_car(r_type type,
                      r_obj* x,
                      enum r_sexp_it_relation* p_rel);
 
 static inline
-r_obj* sexp_node_cdr(enum r_type type,
+r_obj* sexp_node_cdr(r_type type,
                      r_obj* x,
                      enum r_sexp_it_relation* p_rel);
 
 static inline
-r_obj* sexp_node_tag(enum r_type type,
+r_obj* sexp_node_tag(r_type type,
                      r_obj* x,
                      enum r_sexp_it_relation* p_rel);
 

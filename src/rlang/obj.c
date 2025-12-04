@@ -101,7 +101,7 @@ struct r_dict* rlang__precious_dict(void) {
 }
 
 
-enum r_type r_chr_as_r_type(r_obj* type) {
+r_type r_chr_as_r_type(r_obj* type) {
   if (!r_is_string(type)) {
     r_abort("`type` must be a character string.");
   }

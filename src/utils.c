@@ -1444,7 +1444,7 @@ SEXP chr_c(SEXP x, SEXP y) {
   }
 
   r_ssize out_n = r_ssize_add(x_n, y_n);
-  SEXP out = PROTECT(r_alloc_vector(STRSXP, out_n));
+  SEXP out = PROTECT(r_alloc_vector(R_TYPE_character, out_n));
 
   const SEXP* p_x = STRING_PTR_RO(x);
   const SEXP* p_y = STRING_PTR_RO(y);

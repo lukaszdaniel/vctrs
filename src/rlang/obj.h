@@ -10,8 +10,8 @@ r_ssize r_length(r_obj* x) {
 }
 
 static inline
-enum r_type r_typeof(r_obj* x) {
-  return (enum r_type) TYPEOF(x);
+r_type r_typeof(r_obj* x) {
+  return (r_type) TYPEOF(x);
 }
 
 void _r_preserve(r_obj* x);
@@ -86,31 +86,31 @@ r_obj* r_vec_clone(r_obj* x);
 r_obj* r_vec_clone_shared(r_obj* x);
 
 static inline
-r_obj* r_poke_type(r_obj* x, enum r_type type) {
+r_obj* r_poke_type(r_obj* x, r_type type) {
   SET_TYPEOF(x, type);
   return x;
 }
 
 static inline
-r_obj* r_type_as_string(enum r_type type) {
-  return Rf_type2str(type);
+r_obj* r_type_as_string(r_type type) {
+  return Rf_type2str_nowarn( type);
 }
 static inline
-r_obj* r_type_as_character(enum r_type type) {
+r_obj* r_type_as_character(r_type type) {
   r_obj* str = KEEP(r_type_as_string(type));
   r_obj* out = Rf_ScalarString(str);
   return FREE(1), out;
 }
 static inline
-const char* r_type_as_c_string(enum r_type type) {
-  return CHAR(Rf_type2str(type));
+const char* r_type_as_c_string(r_type type) {
+  return CHAR(Rf_type2str_nowarn( type));
 }
 
 static inline
-enum r_type r_c_str_as_r_type(const char* type) {
-  return (enum r_type) Rf_str2type(type);
+r_type r_c_str_as_r_type(const char* type) {
+  return (r_type) Rf_str2type(type);
 }
-enum r_type r_chr_as_r_type(r_obj* type);
+r_type r_chr_as_r_type(r_obj* type);
 
 static inline
 bool r_is_symbolic(r_obj* x) {

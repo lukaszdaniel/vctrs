@@ -73,7 +73,7 @@ struct r_sexp_iterator {
   bool skip_incoming;
 
   r_obj* x;
-  enum r_type type;
+  r_type type;
   int depth;
   r_obj* parent;
   enum r_sexp_it_relation rel;

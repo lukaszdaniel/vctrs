@@ -304,7 +304,7 @@ const char* v_dict_it_df_names_c_strings[] = {
   "value"
 };
 static
-const enum r_type v_dict_it_df_types[] = {
+const r_type v_dict_it_df_types[] = {
   R_TYPE_list,
   R_TYPE_list
 };

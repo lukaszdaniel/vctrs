@@ -285,6 +285,8 @@ bool equal_object_normalized(SEXP x, SEXP y) {
   case ENVSXP:
   case EXTPTRSXP:
     return x == y;
+  default:
+    break;
   }
 
   // For other types, try a pointer comparison first before

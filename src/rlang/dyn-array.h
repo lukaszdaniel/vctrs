@@ -15,12 +15,12 @@ struct r_dyn_array {
   const void* v_data_const;
 
   // private:
-  enum r_type type;
+  r_type type;
   r_ssize elt_byte_size;
   void (*barrier_set)(r_obj* x, r_ssize i, r_obj* value);
 };
 
-struct r_dyn_array* r_new_dyn_vector(enum r_type type,
+struct r_dyn_array* r_new_dyn_vector(r_type type,
                                      r_ssize capacity);
 
 struct r_dyn_array* r_new_dyn_array(r_ssize elt_byte_size,

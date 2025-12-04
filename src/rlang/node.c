@@ -30,7 +30,7 @@ r_obj* r_new_pairlist(const struct r_pair* args,
 
 // Shallow copy of a node tree. Other objects are not cloned.
 r_obj* r_node_tree_clone(r_obj* x) {
-  enum r_type type = r_typeof(x);
+  r_type type = r_typeof(x);
   if (type != R_TYPE_pairlist && type != R_TYPE_call) {
     return x;
   }
@@ -40,7 +40,7 @@ r_obj* r_node_tree_clone(r_obj* x) {
   r_obj* rest = x;
   while (rest != r_null) {
     r_obj* head = r_node_car(rest);
-    enum r_type head_type = r_typeof(head);
+    r_type head_type = r_typeof(head);
 
     if (head_type == R_TYPE_pairlist || head_type == R_TYPE_call) {
       r_node_poke_car(rest, r_node_tree_clone(head));

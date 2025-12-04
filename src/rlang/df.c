@@ -4,7 +4,7 @@
 
 r_obj* r_alloc_df_list(r_ssize n_rows,
                        r_obj* names,
-                       const enum r_type* v_types,
+                       const r_type* v_types,
                        r_ssize types_size) {
   r_obj* out = KEEP(r_alloc_list(types_size));
 
@@ -18,7 +18,7 @@ r_obj* r_alloc_df_list(r_ssize n_rows,
 
   for (r_ssize i = 0; i < types_size; ++i) {
     // A nil type stands for no column allocation
-    enum r_type type = v_types[i];
+    r_type type = v_types[i];
     if (type != R_TYPE_null) {
       r_obj* col = r_alloc_vector(type, n_rows);
       r_list_poke(out, i, col);

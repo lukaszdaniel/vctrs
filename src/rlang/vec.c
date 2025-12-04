@@ -123,7 +123,7 @@ r_obj* r_list_compact(r_obj* x) {
 }
 
 r_obj* r_list_of_as_ptr_ssize(r_obj* xs,
-                              enum r_type type,
+                              r_type type,
                               struct r_pair_ptr_ssize** p_v_out) {
   if (r_typeof(xs) != R_TYPE_list) {
     r_abort("`xs` must be a list.");

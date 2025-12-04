@@ -1,7 +1,7 @@
 #include <rlang.h>
 
 void* r_shelter_deref(r_obj* x) {
-  enum r_type type = r_typeof(x);
+  r_type type = r_typeof(x);
 
   switch (type) {
   case R_TYPE_list:
