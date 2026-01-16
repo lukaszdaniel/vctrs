@@ -49,23 +49,34 @@ void vctrs_init_globals(r_obj* ns) {
 
   // Symbols -----------------------------------------------------------
   syms.arg = r_sym("arg");
+  syms.condition_arg = r_sym("condition_arg");
+  syms.conditions_arg = r_sym("conditions_arg");
+  syms.default_arg = r_sym("default_arg");
   syms.dot_arg = r_sym(".arg");
   syms.dot_call = r_sym(".call");
   syms.dot_error_arg = r_sym(".error_arg");
   syms.dot_error_call = r_sym(".error_call");
+  syms.false_arg = r_sym("false_arg");
+  syms.from_arg = r_sym("from_arg");
   syms.haystack_arg = r_sym("haystack_arg");
+  syms.missing_arg = r_sym("missing_arg");
+  syms.indices_arg = r_sym("indices_arg");
   syms.needles_arg = r_sym("needles_arg");
   syms.recurse = r_sym("recurse");
   syms.repair_arg = r_sym("repair_arg");
   syms.times_arg = r_sym("times_arg");
   syms.to_arg = r_sym("to_arg");
+  syms.true_arg = r_sym("true_arg");
   syms.value_arg = r_sym("value_arg");
+  syms.values_arg = r_sym("values_arg");
   syms.x_arg = r_sym("x_arg");
   syms.y_arg = r_sym("y_arg");
 
   // Strings and characters --------------------------------------------
   INIT_STRING(AsIs);
   INIT_STRING(repair);
+  INIT_STRING(location);
+  INIT_STRING(condition);
 
   // Args --------------------------------------------------------------
   INIT_ARG2(dot_name_repair, ".name_repair");
@@ -77,21 +88,20 @@ void vctrs_init_globals(r_obj* ns) {
   INIT_ARG(n);
   INIT_ARG(value);
   INIT_ARG(x);
+  INIT_ARG(y);
   INIT_ARG(indices);
   INIT_ARG(sizes);
+  INIT_ARG(ptype);
+  INIT_ARG(size);
 
   // Lazy args ---------------------------------------------------------
   INIT_LAZY_ARG_2(dot_name_repair, ".name_repair");
 
   // Calls -------------------------------------------------------------
   INIT_CALL(vec_assign);
-  INIT_CALL(vec_assign_params);
   INIT_CALL(vec_assign_seq);
   INIT_CALL(vec_init);
   INIT_CALL(vec_ptype_finalise);
   INIT_CALL(vec_recycle);
-  INIT_CALL(vec_recycle_common);
   INIT_CALL(vec_size);
-  INIT_CALL(vec_size_common);
-  INIT_CALL(list_all_size);
 }

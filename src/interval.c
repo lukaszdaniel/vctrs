@@ -73,15 +73,17 @@ r_obj* vec_interval_group_info(r_obj* start,
   int n_prot = 0;
 
   int _;
-  r_obj* ptype = vec_ptype2_params(
+  r_obj* ptype = vec_ptype2(
     start,
     end,
     args_start,
     args_end,
     r_lazy_null,
+    S3_FALLBACK_false,
     &_
   );
   KEEP_N(ptype, &n_prot);
+  ptype = KEEP_N(vec_ptype_finalise(ptype), &n_prot);
 
   start = vec_cast_params(
     start,
@@ -211,7 +213,7 @@ r_obj* vec_interval_group_info(r_obj* start,
         int* v_loc = r_int_begin(loc);
 
         const int* v_order_start = v_order + loc_order_start;
-        memcpy(v_loc, v_order_start, loc_size * sizeof(*v_loc));
+        r_memcpy(v_loc, v_order_start, loc_size * sizeof(*v_loc));
       }
 
       loc_order_start = loc_order_end + 1;
@@ -237,7 +239,7 @@ r_obj* vec_interval_group_info(r_obj* start,
       int* v_loc = r_int_begin(loc);
 
       const int* v_order_start = v_order + loc_order_start;
-      memcpy(v_loc, v_order_start, loc_size * sizeof(*v_loc));
+      r_memcpy(v_loc, v_order_start, loc_size * sizeof(*v_loc));
     }
   }
 
@@ -258,7 +260,7 @@ r_obj* vec_interval_group_info(r_obj* start,
       int* v_loc = r_int_begin(loc);
 
       const int* v_order_start = v_order + loc_order_missing_start;
-      memcpy(v_loc, v_order_start, loc_size * sizeof(*v_loc));
+      r_memcpy(v_loc, v_order_start, loc_size * sizeof(*v_loc));
     }
   }
 
@@ -315,15 +317,17 @@ r_obj* vec_interval_complement(r_obj* start,
   int n_prot = 0;
 
   int _;
-  r_obj* ptype = vec_ptype2_params(
+  r_obj* ptype = vec_ptype2(
     start,
     end,
     args_start,
     args_end,
     r_lazy_null,
+    S3_FALLBACK_false,
     &_
   );
   KEEP_N(ptype, &n_prot);
+  ptype = KEEP_N(vec_ptype_finalise(ptype), &n_prot);
 
   start = vec_cast_params(
     start,
@@ -724,15 +728,17 @@ r_obj* vec_interval_locate_containers(r_obj* start, r_obj* end) {
   int n_prot = 0;
 
   int _;
-  r_obj* ptype = vec_ptype2_params(
+  r_obj* ptype = vec_ptype2(
     start,
     end,
     args_start,
     args_end,
     r_lazy_null,
+    S3_FALLBACK_false,
     &_
   );
   KEEP_N(ptype, &n_prot);
+  ptype = KEEP_N(vec_ptype_finalise(ptype), &n_prot);
 
   start = vec_cast_params(
     start,

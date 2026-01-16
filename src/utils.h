@@ -5,13 +5,6 @@
 #include "arg-counter.h"
 #include "rlang-dev.h"
 
-
-#define SWAP(T, x, y) do {                      \
-    T tmp = x;                                  \
-    x = y;                                      \
-    y = tmp;                                    \
-  } while (0)
-
 #define PROTECT_N(x, n) (++*n, PROTECT(x))
 #define PROTECT2(x, y) (PROTECT(x), PROTECT(y))
 
@@ -154,16 +147,19 @@ SEXP s4_find_method(SEXP x, SEXP table);
 SEXP s4_class_find_method(SEXP cls, SEXP table);
 bool vec_implements_ptype2(SEXP x);
 
-SEXP r_env_get(SEXP env, SEXP sym);
-
 extern SEXP syms_s3_methods_table;
+
+// Only namespace environments have `.__S3MethodsTable__.`
 static inline SEXP s3_get_table(SEXP env) {
-  return r_env_get(env, syms_s3_methods_table);
+  if (r_env_has(env, syms_s3_methods_table)) {
+    return r_env_get(env, syms_s3_methods_table);
+  } else {
+    return r_null;
+  }
 }
 
 
 SEXP list_first_non_null(SEXP xs, R_len_t* non_null_i);
-bool list_is_homogeneously_classed(SEXP xs);
 
 // Destructive compacting
 SEXP node_compact_d(SEXP node);
@@ -184,9 +180,16 @@ void init_compact_rep(int* p, R_len_t i, R_len_t n);
 SEXP compact_rep(R_len_t i, R_len_t n);
 bool is_compact_rep(SEXP x);
 
-bool is_compact(SEXP x);
-SEXP compact_materialize(SEXP x);
+r_obj* new_compact_condition(R_xlen_t size);
+bool is_compact_condition(r_obj* x);
+r_ssize compact_condition_size(r_obj* x);
+bool* compact_condition_begin(r_obj* x);
+const bool* compact_condition_cbegin(r_obj* x);
+r_obj* compact_condition_materialize_location(r_obj* x);
+
+SEXP vec_subscript_materialize(SEXP x);
 R_len_t vec_subscript_size(SEXP x);
+r_ssize vec_condition_subscript_sum(r_obj* x, bool na_true);
 
 bool is_integer64(SEXP x);
 
@@ -194,11 +197,6 @@ bool lgl_any_na(SEXP x);
 
 SEXP colnames(SEXP x);
 r_obj* colnames2(r_obj* x);
-
-extern bool (*rlang_is_splice_box)(SEXP);
-extern SEXP (*rlang_unbox)(SEXP);
-extern SEXP (*rlang_env_dots_values)(SEXP);
-extern SEXP (*rlang_env_dots_list)(SEXP);
 
 void* r_vec_deref_barrier(SEXP x);
 const void* r_vec_deref_barrier_const(SEXP x);
@@ -220,6 +218,9 @@ void r_p_chr_fill(SEXP* p_x, SEXP value, R_len_t n);
 void r_int_fill_seq(SEXP x, int start, R_len_t n);
 SEXP r_seq(R_len_t from, R_len_t to);
 bool r_int_any_na(SEXP x);
+
+bool r_lgl_any(r_obj* x);
+r_obj* r_lgl_invert(r_obj* x);
 
 R_len_t r_chr_find(SEXP x, SEXP value);
 
@@ -263,13 +264,29 @@ SEXP r_clone_referenced(SEXP x);
 
 SEXP r_call_n(SEXP fn, SEXP* tags, SEXP* cars);
 
-static inline SEXP r_mark_s4(SEXP x) {
-  SET_S4_OBJECT(x);
-  return(x);
+static inline bool r_is_s4(SEXP x) {
+  return Rf_isS4(x);
 }
-static inline SEXP r_unmark_s4(SEXP x) {
-  UNSET_S4_OBJECT(x);
-  return(x);
+static inline SEXP r_as_s4(SEXP x) {
+  // - Return value must be used, unlike `SET_S4_OBJECT()`
+  // - `Rf_asS4()` calls `shallow_duplicate(x)` if `MAYBE_SHARED(x)`
+  // - `flag = 1` goes through `SET_S4_OBJECT()`
+  // - `complete` is never utilized when `flag = 1`
+  const Rboolean flag = 1;
+  const int complete = 0;
+  return Rf_asS4(x, flag, complete);
+}
+static inline SEXP r_as_not_s4(SEXP x) {
+  // - Return value must be used, unlike `UNSET_S4_OBJECT()`
+  // - `Rf_asS4()` calls `shallow_duplicate(x)` if `MAYBE_SHARED(x)`
+  // - `flag = 0` goes through `UNSET_S4_OBJECT()`
+  // - `complete` is for S4 objects that wrap a "complete" S3 object by placing
+  //   it in the `.Data` slot. If you set `complete = 1`, it will unwrap and
+  //   return that, which we don't want. If `complete = 0`, no additional
+  //   behavior will happen beyond the `UNSET_S4_OBJECT()` call.
+  const Rboolean flag = 0;
+  const int complete = 0;
+  return Rf_asS4(x, flag, complete);
 }
 
 bool r_has_name_at(SEXP names, R_len_t i);
@@ -306,7 +323,8 @@ ERR r_try_catch(void (*fn)(void*),
                 void (*hnd)(void*),
                 void* hnd_data);
 
-extern SEXP result_attrib;
+extern SEXP rlang_result_names;
+extern SEXP rlang_result_class;
 
 static inline SEXP r_result(SEXP x, ERR err) {
   if (!err) {
@@ -317,8 +335,8 @@ static inline SEXP r_result(SEXP x, ERR err) {
   SET_VECTOR_ELT(result, 0, x);
   SET_VECTOR_ELT(result, 1, err);
 
-  SET_ATTRIB(result, result_attrib);
-  SET_OBJECT(result, 1);
+  r_attrib_poke_names(result, rlang_result_names);
+  r_attrib_poke_class(result, rlang_result_class);
 
   UNPROTECT(1);
   return result;
@@ -496,6 +514,7 @@ extern SEXP syms_stop_matches_relationship_one_to_one;
 extern SEXP syms_stop_matches_relationship_one_to_many;
 extern SEXP syms_stop_matches_relationship_many_to_one;
 extern SEXP syms_warn_matches_relationship_many_to_many;
+extern SEXP syms_stop_combine_unmatched;
 extern SEXP syms_action;
 extern SEXP syms_vctrs_common_class_fallback;
 extern SEXP syms_fallback_class;
@@ -507,6 +526,9 @@ extern SEXP syms_required;
 extern SEXP syms_call;
 extern SEXP syms_dot_call;
 extern SEXP syms_which;
+extern SEXP syms_slice_value;
+extern SEXP syms_index_style;
+extern SEXP syms_loc;
 
 static const char * const c_strs_vctrs_common_class_fallback = "vctrs:::common_class_fallback";
 

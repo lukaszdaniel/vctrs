@@ -1,13 +1,9 @@
-
 # vectorised --------------------------------------------------------------
 
 test_that("throws error for unsuported type", {
-  expect_error(.Call(vctrs_equal, expression(x), expression(x), TRUE), class = "vctrs_error_scalar_type")
-})
-
-test_that("C wrapper throws error if length or type doesn't match", {
-  expect_error(.Call(vctrs_equal, 1:2, 1L, TRUE), "same types and lengths")
-  expect_error(.Call(vctrs_equal, 1, 1L, TRUE), "same types and lengths")
+  expect_snapshot(error = TRUE, cnd_class = TRUE, {
+    vec_equal(expression(x), expression(x))
+  })
 })
 
 test_that("correct behaviour for basic vectors", {
@@ -18,9 +14,12 @@ test_that("correct behaviour for basic vectors", {
   expect_equal(vec_equal(as.raw(1:2), as.raw(1L)), c(TRUE, FALSE))
   expect_equal(vec_equal(list(1:3, 1:2), list(1:3)), c(TRUE, FALSE))
   expect_equal(vec_equal(list(1:3, 1.5), list(1:3)), c(TRUE, FALSE))
-  expect_equal(vec_equal(list(as.raw(1:3), as.raw(1.5)), list(as.raw(1:3))), c(TRUE, FALSE))
-  expect_equal(vec_equal(list(1+1i, 1+0i), list(1+1i)), c(TRUE, FALSE))
-  expect_equal(vec_equal(c(1, 2) + 1i, 1+1i), c(TRUE, FALSE))
+  expect_equal(
+    vec_equal(list(as.raw(1:3), as.raw(1.5)), list(as.raw(1:3))),
+    c(TRUE, FALSE)
+  )
+  expect_equal(vec_equal(list(1 + 1i, 1 + 0i), list(1 + 1i)), c(TRUE, FALSE))
+  expect_equal(vec_equal(c(1, 2) + 1i, 1 + 1i), c(TRUE, FALSE))
 })
 
 test_that("NAs are equal", {
@@ -64,8 +63,8 @@ test_that("can compare data frames with various types of columns", {
   x5 <- data_frame(x = as.raw(0))
   y5 <- data_frame(x = as.raw(1))
 
-  x6 <- data_frame(x = 1+0i)
-  y6 <- data_frame(x = 1+1i)
+  x6 <- data_frame(x = 1 + 0i)
+  y6 <- data_frame(x = 1 + 1i)
 
   expect_false(vec_equal(x1, y1))
   expect_false(vec_equal(x2, y2))
@@ -90,52 +89,39 @@ test_that("can compare data frames with list columns", {
   expect_equal(vec_equal(df1, df2), c(FALSE, TRUE))
 })
 
-test_that("data frames must have same size and columns", {
-  expect_error(.Call(vctrs_equal,
-    data.frame(x = 1),
-    data.frame(x = 1, y = 2),
-    TRUE
-  ),
-    "must have same types and lengths"
-  )
-
-  expect_error(.Call(vctrs_equal,
-    data.frame(x = 1, y = 2, z = 2),
-    data.frame(x = 1, y = 2),
-    TRUE
+test_that("data frames are cast to common type", {
+  expect_identical(
+    vec_equal(
+      data.frame(x = 1),
+      data.frame(x = 1, y = 2),
+      na_equal = TRUE
     ),
-    "must have the same number of columns"
+    FALSE
   )
-
-  # Names are not checked, as `vec_cast_common()` should take care of the type.
-  # So if `vec_cast_common()` is not called, or is improperly specified, then
-  # this could result in false equality.
-  expect_true(.Call(vctrs_equal,
-    data.frame(x = 1),
-    data.frame(y = 1),
-    TRUE
-  ))
-
-  expect_error(.Call(vctrs_equal,
-    data.frame(x = 1:2, y = 3:4),
-    data.frame(x = 1, y = 2),
-    TRUE
+  expect_identical(
+    vec_equal(
+      data.frame(x = 1, y = 2, z = 2),
+      data.frame(x = 1, y = 2),
+      na_equal = TRUE
     ),
-    "must have same types and lengths"
+    FALSE
+  )
+  expect_identical(
+    vec_equal(
+      data.frame(x = 1),
+      data.frame(y = 1),
+      na_equal = TRUE
+    ),
+    FALSE
   )
 
-  expect_false(.Call(vctrs_equal,
-    data.frame(x = 1),
-    data.frame(x = 2),
-    TRUE
-  ))
-
-  expect_false(.Call(vctrs_equal,
-    list(data.frame(x = 1)),
-    list(10),
-    TRUE
-  ))
-
+  expect_identical(
+    vec_equal(
+      data.frame(x = 1),
+      data.frame(x = 2)
+    ),
+    FALSE
+  )
 })
 
 test_that("can compare data frames with 0 columns", {
@@ -213,10 +199,46 @@ test_that("vec_equal() silently falls back to base data frame", {
   ))
 })
 
+test_that("recycling works in all cases", {
+  # Both size 1 is its own path. Both "recycle".
+  x <- 1
+  y <- 1
+  expect_identical(vec_equal(x, y), TRUE)
+
+  x <- 1
+  y <- 1:2
+  expect_identical(vec_equal(x, y), c(TRUE, FALSE))
+
+  x <- 1:2
+  y <- 1
+  expect_identical(vec_equal(x, y), c(TRUE, FALSE))
+
+  x <- 1:2
+  y <- 1:2
+  expect_identical(vec_equal(x, y), c(TRUE, TRUE))
+
+  # Again, with data frames
+
+  x <- data.frame(x = 1, y = 2)
+  y <- data.frame(x = 1, y = 2)
+  expect_identical(vec_equal(x, y), TRUE)
+
+  x <- data.frame(x = 1, y = 2)
+  y <- data.frame(x = 1:2, y = 2:3)
+  expect_identical(vec_equal(x, y), c(TRUE, FALSE))
+
+  x <- data.frame(x = 1:2, y = 2:3)
+  y <- data.frame(x = 1, y = 2)
+  expect_identical(vec_equal(x, y), c(TRUE, FALSE))
+
+  x <- data.frame(x = 1:2, y = 2:3)
+  y <- data.frame(x = 1:2, y = 2:3)
+  expect_identical(vec_equal(x, y), c(TRUE, TRUE))
+})
 
 # object ------------------------------------------------------------------
 
-test_that("can compare NULL",{
+test_that("can compare NULL", {
   expect_true(obj_equal(NULL, NULL))
 })
 
@@ -265,6 +287,20 @@ test_that("not equal if attributes not equal", {
 test_that("can compare expressions", {
   expect_true(obj_equal(expression(x), expression(x)))
   expect_false(obj_equal(expression(x), expression(y)))
+
+  # Attributes on the expression vectors
+  expect_true(obj_equal(
+    vec_set_attributes(expression(x), list(foo = 1)),
+    vec_set_attributes(expression(x), list(foo = 1))
+  ))
+  expect_false(obj_equal(
+    vec_set_attributes(expression(x), list(foo = 1)),
+    vec_set_attributes(expression(x), list(foo = 2))
+  ))
+
+  # Length check
+  expect_true(obj_equal(expression(x, y), expression(x, y)))
+  expect_false(obj_equal(expression(x, y), expression(x)))
 })
 
 # na ----------------------------------------------------------------------

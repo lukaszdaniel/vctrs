@@ -1,86 +1,116 @@
 #include "vctrs.h"
+
+struct ptype_common_reduce_opts {
+  struct r_lazy call;
+  enum s3_fallback s3_fallback;
+};
+
 #include "decl/ptype-common-decl.h"
 
 // [[ register(external = TRUE) ]]
 r_obj* ffi_ptype_common(r_obj* ffi_call, r_obj* op, r_obj* args, r_obj* env) {
   args = r_node_cdr(args);
 
-  r_obj* types = KEEP(rlang_env_dots_list(env));
-  r_obj* ptype = KEEP(r_eval(r_node_car(args), env));
+  r_obj* xs = r_node_car(args); args = r_node_cdr(args);
+  r_obj* ptype = r_node_car(args); args = r_node_cdr(args);
+  r_obj* ffi_finalise = r_node_car(args);
 
   struct r_lazy call = { .x = syms.dot_call, .env = env };
-  struct r_lazy arg_lazy = { .x = syms.dot_arg, .env = env };
-  struct vctrs_arg arg = new_lazy_arg(&arg_lazy);
+  struct r_lazy xs_arg_lazy = { .x = syms.dot_arg, .env = env };
+  struct vctrs_arg xs_arg = new_lazy_arg(&xs_arg_lazy);
 
-  r_obj* out = vec_ptype_common_params(types,
-                                       ptype,
-                                       S3_FALLBACK_false,
-                                       &arg,
-                                       call);
+  const enum ptype_finalise finalise = r_arg_as_bool(ffi_finalise, ".finalise") ?
+    PTYPE_FINALISE_true :
+    PTYPE_FINALISE_false;
+  const enum s3_fallback s3_fallback = S3_FALLBACK_false;
 
-  FREE(2);
+  r_obj* out = vec_ptype_common(
+    xs,
+    ptype,
+    finalise,
+    s3_fallback,
+    &xs_arg,
+    call
+  );
+
   return out;
 }
 
 // [[ register(external = TRUE) ]]
-r_obj* ffi_ptype_common_opts(r_obj* call, r_obj* op, r_obj* args, r_obj* env) {
+r_obj* ffi_ptype_common_params(r_obj* ffi_call, r_obj* op, r_obj* args, r_obj* env) {
   args = r_node_cdr(args);
 
-  r_obj* types = KEEP(rlang_env_dots_list(env));
-  r_obj* ptype = KEEP(r_eval(r_node_car(args), env)); args = r_node_cdr(args);
-  r_obj* opts = KEEP(r_eval(r_node_car(args), env));
+  r_obj* xs = r_node_car(args); args = r_node_cdr(args);
+  r_obj* ptype = r_node_car(args); args = r_node_cdr(args);
+  r_obj* ffi_finalise = r_node_car(args); args = r_node_cdr(args);
+  r_obj* opts = r_node_car(args);
 
-  struct ptype_common_opts ptype_opts = {
-    .call = { .x = syms.dot_call, .env = env },
-    .fallback = new_fallback_opts(opts)
-  };
-  r_obj* out = vec_ptype_common_opts(types, ptype, &ptype_opts);
+  struct r_lazy call = { .x = syms.dot_call, .env = env };
+  struct r_lazy xs_arg_lazy = { .x = syms.dot_arg, .env = env };
+  struct vctrs_arg xs_arg = new_lazy_arg(&xs_arg_lazy);
 
-  FREE(3);
+  const enum ptype_finalise finalise = r_arg_as_bool(ffi_finalise, ".finalise") ?
+    PTYPE_FINALISE_true :
+    PTYPE_FINALISE_false;
+  const enum s3_fallback s3_fallback = s3_fallback_from_opts(opts);
+
+  r_obj* out = vec_ptype_common(
+    xs,
+    ptype,
+    finalise,
+    s3_fallback,
+    &xs_arg,
+    call
+  );
+
   return out;
 }
 
-r_obj* vec_ptype_common_opts(r_obj* dots,
-                             r_obj* ptype,
-                             const struct ptype_common_opts* opts) {
-  if (!vec_is_partial(ptype)) {
-    return vec_ptype(ptype, vec_args.dot_ptype, opts->call);
-  }
+// Invariant of `vec_ptype_common()` is that the output is always a finalised `ptype`,
+// even if the user provided their own, unless `PTYPE_FINALISE_false` is specified.
+r_obj* vec_ptype_common(
+  r_obj* dots,
+  r_obj* ptype,
+  enum ptype_finalise finalise,
+  enum s3_fallback s3_fallback,
+  struct vctrs_arg* p_arg,
+  struct r_lazy call
+) {
+  int n_prot = 0;
 
-  if (r_is_true(r_peek_option("vctrs.no_guessing"))) {
-    r_abort_lazy_call(r_lazy_null, "strict mode is activated; you must supply complete `.ptype`.");
-  }
+  r_obj* out;
 
-  // Remove constness
-  struct ptype_common_opts mut_opts = *opts;
-
-  // Start reduction with the `.ptype` argument
-  r_obj* type = KEEP(reduce(ptype,
-                            vec_args.dot_ptype,
-                            mut_opts.p_arg,
-                            dots,
-                            &ptype2_common,
-                            &mut_opts));
-  type = vec_ptype_finalise(type);
-
-  FREE(1);
-  return type;
-}
-
-r_obj* vec_ptype_common_params(r_obj* dots,
-                               r_obj* ptype,
-                               enum s3_fallback s3_fallback,
-                               struct vctrs_arg* p_arg,
-                               struct r_lazy call) {
-  struct ptype_common_opts opts = {
-    .call = call,
-    .p_arg = p_arg,
-    .fallback = {
-      .s3 = s3_fallback
+  if (ptype != r_null) {
+    out = KEEP_N(vec_ptype(ptype, vec_args.dot_ptype, call), &n_prot);
+  } else {
+    if (r_is_true(r_peek_option("vctrs.no_guessing"))) {
+      r_abort_lazy_call(r_lazy_null, "strict mode is activated; you must supply complete `.ptype`.");
     }
-  };
 
-  return vec_ptype_common_opts(dots, ptype, &opts);
+    struct ptype_common_reduce_opts reduce_opts = {
+      .call = call,
+      .s3_fallback = s3_fallback
+    };
+
+    out = KEEP_N(
+      reduce(
+        r_null,
+        vec_args.empty,
+        p_arg,
+        dots,
+        &ptype2_common,
+        &reduce_opts
+      ),
+      &n_prot
+    );
+  }
+
+  if (should_finalise(finalise)) {
+    out = KEEP_N(vec_ptype_finalise(out), &n_prot);
+  }
+
+  FREE(n_prot);
+  return out;
 }
 
 static
@@ -90,18 +120,17 @@ r_obj* ptype2_common(r_obj* current,
                      void* p_data) {
   int left = -1;
 
-  struct ptype_common_opts* p_common_opts = (struct ptype_common_opts*) p_data;
+  struct ptype_common_reduce_opts* p_reduce_opts = (struct ptype_common_reduce_opts*) p_data;
 
-  const struct ptype2_opts opts = {
-    .x = current,
-    .y = next,
-    .p_x_arg = counters->curr_arg,
-    .p_y_arg = counters->next_arg,
-    .call = p_common_opts->call,
-    .fallback = p_common_opts->fallback
-  };
-
-  current = vec_ptype2_opts(&opts, &left);
+  current = vec_ptype2(
+    current,
+    next,
+    counters->curr_arg,
+    counters->next_arg,
+    p_reduce_opts->call,
+    p_reduce_opts->s3_fallback,
+    &left
+  );
 
   // Update current if RHS is the common type. Otherwise the previous
   // counter stays in effect.

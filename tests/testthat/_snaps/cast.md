@@ -83,3 +83,25 @@
       i Please use `allow_lossy_cast()` instead.
       i We detected a lossy transformation from `x` <fct> to `to` <fct>. The result will contain lower-resolution values or missing values. To suppress this warning, wrap your code with `allow_lossy_cast()`.
 
+# can cast to unspecified `NA` with `vec_cast()` and `vec_cast_common()` (#2099)
+
+    Code
+      vec_cast(TRUE, to = unspecified(1))
+    Condition
+      Error:
+      ! Can't convert `TRUE` <logical> to <vctrs_unspecified>.
+
+# casting performs expected allocations
+
+    Code
+      x <- matrix(rep(1L, 100), ncol = 2)
+      with_memory_prof(vec_cast(x, x))
+    Output
+      [1] 0B
+    Code
+      x <- matrix(rep(1L, 100), ncol = 2)
+      y <- matrix(rep(1, 100), ncol = 2)
+      with_memory_prof(vec_cast(x, y))
+    Output
+      [1] 848B
+

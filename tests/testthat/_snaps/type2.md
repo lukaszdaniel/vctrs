@@ -38,6 +38,7 @@
       <error/vctrs_error_scalar_type>
       Error:
       ! `foo` must be a vector, not a symbol.
+      i Read our FAQ about scalar types (`?vctrs::faq_error_scalar_type`) to learn more.
     Code
       (expect_error(vec_ptype2(quote(x), NULL, x_arg = "foo"), class = "vctrs_error_scalar_type")
       )
@@ -45,6 +46,7 @@
       <error/vctrs_error_scalar_type>
       Error:
       ! `foo` must be a vector, not a symbol.
+      i Read our FAQ about scalar types (`?vctrs::faq_error_scalar_type`) to learn more.
 
 # can override scalar vector error message for S3 types
 
@@ -55,6 +57,9 @@
       <error/vctrs_error_scalar_type>
       Error:
       ! `foo` must be a vector, not a <vctrs_foobar> object.
+      x Detected incompatible scalar S3 list. To be treated as a vector, the object must explicitly inherit from <list> or should implement a `vec_proxy()` method. Class: <vctrs_foobar>.
+      i If this object comes from a package, please report this error to the package author.
+      i Read our FAQ about creating vector types (`?vctrs::howto_faq_fix_scalar_type_error`) to learn more.
     Code
       (expect_error(vec_ptype2(foobar(), NULL, x_arg = "foo"), class = "vctrs_error_scalar_type")
       )
@@ -62,6 +67,9 @@
       <error/vctrs_error_scalar_type>
       Error:
       ! `foo` must be a vector, not a <vctrs_foobar> object.
+      x Detected incompatible scalar S3 list. To be treated as a vector, the object must explicitly inherit from <list> or should implement a `vec_proxy()` method. Class: <vctrs_foobar>.
+      i If this object comes from a package, please report this error to the package author.
+      i Read our FAQ about creating vector types (`?vctrs::howto_faq_fix_scalar_type_error`) to learn more.
 
 # ptype2 and cast errors when same class fallback is impossible are informative
 
@@ -88,13 +96,15 @@
     Code
       with_foobar_cast <- (function(expr) {
         with_methods(vec_cast.vctrs_foobar = function(...) NULL,
-        vec_cast.vctrs_foobar.vctrs_foobar = function(x, to, ...) vec_default_cast(x,
-          to, ...), expr)
+        vec_cast.vctrs_foobar.vctrs_foobar = function(x, to, ...) {
+          vec_default_cast(x, to, ...)
+        }, expr)
       })
       with_foobar_ptype2 <- (function(expr) {
         with_methods(vec_ptype2.vctrs_foobar = function(...) NULL,
-        vec_ptype2.vctrs_foobar.vctrs_foobar = function(x, y, ...) vec_default_ptype2(
-          x, y, ...), expr)
+        vec_ptype2.vctrs_foobar.vctrs_foobar = function(x, y, ...) {
+          vec_default_ptype2(x, y, ...)
+        }, expr)
       })
       (expect_error(with_foobar_cast(vec_cast(foobar(1, bar = TRUE), foobar(2, baz = TRUE))),
       class = "vctrs_error_incompatible_type"))
@@ -109,4 +119,36 @@
       <error/vctrs_error_ptype2>
       Error:
       ! Can't combine `foobar(1, bar = TRUE)` <vctrs_foobar> and `foobar(2, baz = TRUE)` <vctrs_foobar>.
+
+# error indexing is correct with unspecifieds
+
+    Code
+      vec_ptype_common(1, NA, "x")
+    Condition
+      Error:
+      ! Can't combine `..1` <double> and `..3` <character>.
+
+---
+
+    Code
+      vec_ptype_common(NA, 1, "x")
+    Condition
+      Error:
+      ! Can't combine `..2` <double> and `..3` <character>.
+
+---
+
+    Code
+      vec_ptype_common(NA, NA, 1, "x")
+    Condition
+      Error:
+      ! Can't combine `..3` <double> and `..4` <character>.
+
+---
+
+    Code
+      vec_ptype_common(1, NA, NA, 1, "x")
+    Condition
+      Error:
+      ! Can't combine `..1` <double> and `..5` <character>.
 

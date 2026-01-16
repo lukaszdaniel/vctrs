@@ -1,20 +1,33 @@
 #' Get or set observations in a vector
 #'
 #' This provides a common interface to extracting and modifying observations
-#' for all vector types, regardless of dimensionality. It is an analog to `[`
-#' that matches [vec_size()] instead of `length()`.
+#' for all vector types, regardless of dimensionality. They are analogs to `[`
+#' and `[<-` that match [vec_size()] instead of `length()`.
 #'
 #' @inheritParams rlang::args_dots_empty
 #' @inheritParams rlang::args_error_context
 #'
 #' @param x A vector
-#' @param i An integer, character or logical vector specifying the
-#'   locations or names of the observations to get/set. Specify
-#'   `TRUE` to index all elements (as in `x[]`), or `NULL`, `FALSE` or
-#'   `integer()` to index none (as in `x[NULL]`).
-#' @param value Replacement values. `value` is cast to the type of
-#'   `x`, but only if they have a common type. See below for examples
-#'   of this rule.
+#'
+#' @param i An integer, character or logical vector specifying the locations or
+#'   names of the observations to get/set. Specify `TRUE` to index all elements
+#'   (as in `x[]`), or `NULL`, `FALSE` or `integer()` to index none (as in
+#'   `x[NULL]`).
+#'
+#' @param value A vector of replacement values
+#'
+#'   `value` is cast to the type of `x`.
+#'
+#'   If `slice_value = FALSE`, `value` must be size 1 or the same size as `i`
+#'   after `i` has been converted to a positive integer location vector with
+#'   [vec_as_location()] (which may not be the same size as `i` originally).
+#'
+#'   If `slice_value = TRUE`, `value` must be size 1 or the same size as `x`.
+#'
+#' @param slice_value A boolean. If `TRUE`, the assignment proceeds as if you
+#'   had provided `vec_slice(x, i) <- vec_slice(value, i)`, but is optimized to
+#'   avoid materializing the slice of `value`.
+#'
 #' @param x_arg,value_arg Argument names for `x` and `value`. These are used
 #'   in error messages to inform the user about the locations of
 #'   incompatible types and sizes (see [stop_incompatible_type()] and
@@ -27,10 +40,23 @@
 #' Support for S3 objects depends on whether the object implements a
 #' [vec_proxy()] method.
 #'
-#' * When a `vec_proxy()` method exists, the proxy is sliced and
+#' * When a `vec_proxy()` method exists, the proxy is sliced or assigned to and
 #'   `vec_restore()` is called on the result.
 #'
-#' * Otherwise `vec_slice()` falls back to the base generic `[`.
+#' * Otherwise, `vec_slice()` falls back to the base generic `[` and
+#'   `vec_slice<-()` falls back to the base generic `[<-`.
+#'
+#' When `vec_slice<-()` falls back to `[<-`, it is expected that the subclass's
+#' `[<-` method can handle the following subset of cases that base R's `[<-`
+#' can also handle:
+#'
+#' * An `i` vector of positive integer positions (notably excluding `NA`).
+#'
+#' * A `value` vector of length 1 or length `length(i)`. If length 1, it
+#'   should be recycled by the `[<-` method to the length of `i`.
+#'
+#' If your `[<-` method eventually calls base R's native `[<-` code, then these
+#' cases will be handled for you.
 #'
 #' Note that S3 lists are treated as scalars by default, and will
 #' cause an error if they don't implement a [vec_proxy()] method.
@@ -55,9 +81,7 @@
 #' ## base dependencies
 #'
 #' - \code{base::`[`}
-#'
-#' If a non-data-frame vector class doesn't have a [vec_proxy()]
-#' method, the vector is sliced with `[` instead.
+#' - \code{base::`[<-`}
 #'
 #' @export
 #' @keywords internal
@@ -107,6 +131,31 @@
 #' # vector:
 #' x <- 1:3
 #' try(vec_slice(x, 2) <- 1.5)
+#'
+#' # Slicing `value` -------------------------------------------------
+#'
+#' # Sometimes both `x` and `value` start from objects that are the same length,
+#' # and you need to slice `value` by `i` before assigning it to `x`. This comes
+#' # up when thinking about how `base::ifelse()` and `dplyr::case_when()` work.
+#' condition <- c(TRUE, FALSE, TRUE, FALSE)
+#' yes <- 1:4
+#' no <- 5:8
+#'
+#' # Create an output container and fill it
+#' out <- vec_init(integer(), 4)
+#' out <- vec_assign(out, condition, vec_slice(yes, condition))
+#' out <- vec_assign(out, !condition, vec_slice(no, !condition))
+#' out
+#'
+#' # This is wasteful because you have to materialize the slices of `yes` and
+#' # `no` before they can be assigned, and you also have to validate `condition`
+#' # multiple times. Using `slice_value` internally performs
+#' # `vec_slice(yes, condition)` and `vec_slice(no, !condition)` for you,
+#' # but does so in a way that avoids the materialization.
+#' out <- vec_init(integer(), 4)
+#' out <- vec_assign(out, condition, yes, slice_value = TRUE)
+#' out <- vec_assign(out, !condition, no, slice_value = TRUE)
+#' out
 vec_slice <- function(x, i, ..., error_call = current_env()) {
   check_dots_empty0(...)
   .Call(ffi_slice, x, i, environment())
@@ -145,7 +194,7 @@ vec_slice_fallback_integer64 <- function(x, i) {
   }
 
   if (d == 2) {
-    out[is_na,] <- bit64::NA_integer64_
+    out[is_na, ] <- bit64::NA_integer64_
   } else {
     eval_bare(expr(out[is_na, !!!miss_args] <- bit64::NA_integer64_))
   }
@@ -170,26 +219,91 @@ vec_slice_dispatch_integer64 <- function(x, i) {
   out
 }
 
+vec_slice_altrep <- function(x, i) {
+  # We have already validated `i`, it is one of:
+  # - Integer vector from `vec_as_location()`
+  # - Integer vector from materializing a `compact_rep()`
+  # - Integer vector from materializing a `compact_seq()`
+  # - Logical vector from materializing a `compact_condition()`
+  #   (which `VectorSubset()` will convert to an integer vector)
+
+  # For the main case we care about (an ALTREP vector with an Extract_Subset
+  # method, like vroom), `.subset()` will:
+  # - Call `do_subset_dflt()` (bypassing S3 dispatch!)
+  # - Call `VectorSubset()`
+  # - Call `ExtractSubset()`
+  # - Call `ALTVEC_EXTRACT_SUBSET()`
+  # - If that returns `NULL`, i.e. if this ALTREP class has not implemented an
+  #   ALTREP `Extract_Subset` method, then it will use the `Elt` method to
+  #   subset
+  .subset(x, i)
+}
+
 
 #' @rdname vec_slice
 #' @export
 `vec_slice<-` <- function(x, i, value) {
   x_arg <- "" # Substitution is `*tmp*`
   delayedAssign("value_arg", as_label(substitute(value)))
-
-  .Call(ffi_assign, x, i, value, environment())
+  slice_value <- FALSE
+  .Call(ffi_assign, x, i, value, slice_value, environment())
 }
 #' @rdname vec_slice
 #' @export
-vec_assign <- function(x, i, value, ..., x_arg = "", value_arg = "") {
+vec_assign <- function(
+  x,
+  i,
+  value,
+  ...,
+  slice_value = FALSE,
+  x_arg = "",
+  value_arg = ""
+) {
   check_dots_empty0(...)
-  .Call(ffi_assign, x, i, value, environment())
+  .Call(ffi_assign, x, i, value, slice_value, environment())
 }
-vec_assign_fallback <- function(x, i, value) {
-  # Work around bug in base `[<-`
-  existing <- !is.na(i)
-  i <- vec_slice(i, existing)
-  value <- vec_slice(value, existing)
+
+# Invariants for `[<-` methods:
+#
+# - `i` will contain positive integers
+# - `i` will not contain `NA` (a base `[<-` issue gets in the way if we allow this)
+# - `value` will be size 1 or size `length(i)`
+#
+# Given these invariants, the base `[<-` works the way we want it to in fallback
+# methods, and we expect any subclasses to also uphold the same behavior as base
+# `[<-` with these inputs. In other words, we don't expect subclasses to have
+# vctrs subassign behavior, but we do expect them to match a subset of base R
+# subassign behavior.
+vec_assign_fallback <- function(x, i, value, slice_value, index_style) {
+  if (index_style == "condition") {
+    # Convert logical condition `i` to integer location `i`. Must use
+    # `vec_as_location()` rather than `which()` because we want `NA` values to
+    # propagate, which is consistent with how `value`'s size is checked
+    # internally (i.e. when `slice_value = FALSE`, `value` was checked to have
+    # size equal to the number of `TRUE` or `NA` values in `i`). Propagated
+    # `NA`s are later dropped before calling `[<-` to work around a base `[<-`
+    # issue, but we need them to slice both `i` and `value` consistently.
+    i <- vec_as_location(i, n = vec_size(x), missing = "propagate")
+  }
+
+  if (slice_value && vec_size(value) != 1L) {
+    # `value` has same size as `x` rather than same size as `i`.
+    # We need to pre-slice it down to same size as `i` to match what `[<-` expects.
+    # Effectively we are preemptively doing the RHS of this:
+    # vec_slice(x, i) <- vec_slice(value, i)
+    value <- vec_slice(value, i)
+  }
+
+  # Work around issue in base `[<-` that errors on `NA_integer_` in subassign
+  # indices. Only do this as necessary, as `vec_slice()` will typically call
+  # back to `[` when slicing `value` here, which is somewhat slow.
+  if (vec_any_missing(i)) {
+    existing <- !is.na(i)
+    i <- vec_slice(i, existing)
+    if (vec_size(value) != 1L) {
+      value <- vec_slice(value, existing)
+    }
+  }
 
   d <- vec_dim_n(x)
   miss_args <- rep(list(missing_arg()), d - 1)
@@ -198,12 +312,59 @@ vec_assign_fallback <- function(x, i, value) {
 }
 
 # `start` is 0-based
-vec_assign_seq <- function(x, value, start, size, increasing = TRUE) {
-  .Call(ffi_assign_seq, x, value, start, size, increasing)
+vec_assign_seq <- function(
+  x,
+  value,
+  start,
+  size,
+  increasing = TRUE,
+  slice_value = FALSE
+) {
+  .Call(ffi_assign_seq, x, value, start, size, increasing, slice_value)
 }
 
-vec_assign_params <- function(x, i, value, assign_names = FALSE) {
-  .Call(ffi_assign_params, x, i, value, assign_names)
+# `start` is 0-based
+compact_seq <- function(start, size, increasing = TRUE) {
+  .Call(ffi_compact_seq, start, size, increasing)
+}
+
+vec_assign_compact_condition <- function(
+  x,
+  i,
+  value,
+  slice_value = FALSE
+) {
+  .Call(ffi_assign_compact_condition, x, i, value, slice_value)
+}
+
+as_compact_condition <- function(x) {
+  .Call(ffi_as_compact_condition, x)
+}
+
+#' @param assign_names A boolean. If `TRUE`, will assign names from `value`
+#'   onto `x` as well.
+#'
+#' @noRd
+vec_assign_params <- function(
+  x,
+  i,
+  value,
+  ...,
+  assign_names = FALSE,
+  slice_value = FALSE,
+  x_arg = "",
+  value_arg = ""
+) {
+  check_dots_empty0(...)
+  .Call(
+    ffi_assign_params,
+    x,
+    i,
+    value,
+    assign_names,
+    slice_value,
+    environment()
+  )
 }
 
 vec_remove <- function(x, i) {
@@ -235,7 +396,12 @@ vec_index <- function(x, i, ...) {
 #' @examples
 #' vec_init(1:10, 3)
 #' vec_init(Sys.Date(), 5)
+#'
+#' # The "missing" value for a data frame is a row that is entirely missing
 #' vec_init(mtcars, 2)
+#'
+#' # The "missing" value for a list is `NULL`
+#' vec_init(list(), 3)
 vec_init <- function(x, n = 1L) {
   .Call(ffi_init, x, n, environment())
 }

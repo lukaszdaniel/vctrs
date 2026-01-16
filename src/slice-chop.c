@@ -177,7 +177,8 @@ r_obj* vec_chop(r_obj* x, r_obj* indices, r_obj* sizes) {
   }
 
   if (indices != r_null) {
-    indices = list_as_locations(indices, n, names);
+    const bool allow_compact = false;
+    indices = list_as_locations(indices, n, names, allow_compact);
   }
   KEEP(indices);
 
@@ -195,7 +196,7 @@ r_obj* vec_chop(r_obj* x, r_obj* indices, r_obj* sizes) {
 // Performance variant that doesn't check the types or values of `indices` / `sizes`
 r_obj* vec_chop_unsafe(r_obj* x, r_obj* indices, r_obj* sizes) {
   struct vctrs_proxy_info info = vec_proxy_info(x);
-  KEEP(info.shelter);
+  KEEP(info.inner);
 
   struct vctrs_chop_indices* p_indices = new_chop_indices(x, indices, sizes);
   KEEP(p_indices->shelter);
@@ -242,7 +243,7 @@ r_obj* vec_chop_base(r_obj* x,
     return chop_df(x, info, p_indices);
   }
   default:
-    obj_check_vector(x, vec_args.empty, r_lazy_null);
+    obj_check_vector(x, VCTRS_ALLOW_NULL_no, vec_args.empty, r_lazy_null);
     stop_unimplemented_vctrs_type("vec_chop_base", info.type);
   }
 }
@@ -251,12 +252,19 @@ static
 r_obj* chop(r_obj* x,
             struct vctrs_proxy_info info,
             struct vctrs_chop_indices* p_indices) {
-  r_obj* proxy = info.proxy;
+  r_obj* proxy = info.inner;
   r_obj* names = KEEP(r_names(proxy));
   const enum vctrs_type type = info.type;
 
   const r_ssize out_size = indices_out_size(p_indices, proxy);
   r_obj* out = KEEP(r_alloc_list(out_size));
+
+  // Treat `elt` as owned after slicing (we also poke its names directly).
+  // `vec_proxy_info()` doesn't recursively proxy.
+  const struct vec_restore_opts elt_restore_opts = {
+    .ownership = VCTRS_OWNERSHIP_shallow,
+    .recursively_proxied = false
+  };
 
   for (r_ssize i = 0; i < out_size; ++i) {
     r_obj* index = indices_next(p_indices);
@@ -278,7 +286,7 @@ r_obj* chop(r_obj* x,
       r_attrib_poke_names(elt, elt_names);
     }
 
-    elt = vec_restore(elt, x, vec_owned(elt));
+    elt = vec_restore_opts(elt, x, &elt_restore_opts);
     r_list_poke(out, i, elt);
 
     FREE(1);
@@ -292,7 +300,7 @@ static
 r_obj* chop_df(r_obj* x,
                struct vctrs_proxy_info info,
                struct vctrs_chop_indices* p_indices) {
-  r_obj* proxy = info.proxy;
+  r_obj* proxy = info.inner;
   r_obj* const* v_proxy = r_list_cbegin(proxy);
 
   const r_ssize n_cols = r_length(proxy);
@@ -342,10 +350,19 @@ r_obj* chop_df(r_obj* x,
     FREE(1);
   }
 
+  // Each data frame container is owned by us.
+  // Columns aren't necessarily owned by us, but that
+  // doesn't matter because we don't recursively restore.
+  // `vec_proxy_info()` doesn't recursively proxy.
+  const struct vec_restore_opts elt_restore_opts = {
+    .ownership = VCTRS_OWNERSHIP_shallow,
+    .recursively_proxied = false
+  };
+
   // Restore each data frame
   for (r_ssize i = 0; i < out_size; ++i) {
     r_obj* elt = v_out[i];
-    elt = vec_restore(elt, x, vec_owned(elt));
+    elt = vec_restore_opts(elt, x, &elt_restore_opts);
     r_list_poke(out, i, elt);
   }
 
@@ -357,7 +374,7 @@ static
 r_obj* chop_shaped(r_obj* x,
                    struct vctrs_proxy_info info,
                    struct vctrs_chop_indices* p_indices) {
-  r_obj* proxy = info.proxy;
+  r_obj* proxy = info.inner;
   const enum vctrs_type type = info.type;
 
   r_obj* dim_names = KEEP(r_dim_names(proxy));
@@ -369,6 +386,13 @@ r_obj* chop_shaped(r_obj* x,
 
   const r_ssize out_size = indices_out_size(p_indices, proxy);
   r_obj* out = KEEP(r_alloc_list(out_size));
+
+  // Treat each `elt` as owned (we also poke its dim names)
+  // `vec_proxy_info()` doesn't recursively proxy.
+  const struct vec_restore_opts elt_restore_opts = {
+    .ownership = VCTRS_OWNERSHIP_shallow,
+    .recursively_proxied = false
+  };
 
   for (r_ssize i = 0; i < out_size; ++i) {
     r_obj* index = indices_next(p_indices);
@@ -389,7 +413,7 @@ r_obj* chop_shaped(r_obj* x,
       }
     }
 
-    elt = vec_restore(elt, x, vec_owned(elt));
+    elt = vec_restore_opts(elt, x, &elt_restore_opts);
     r_list_poke(out, i, elt);
 
     FREE(1);
@@ -421,16 +445,21 @@ r_obj* chop_fallback(r_obj* x, struct vctrs_chop_indices* p_indices) {
     r_env_poke(env, syms_bracket, fns_bracket);
   }
 
+  // Sliced `elt` comes from R, so is foreign. Technically not proxied at all,
+  // so "restoring" is a bit of a hack, but we only restore if it looks like the
+  // `[` result is missing attributes.
+  struct vec_restore_opts elt_restore_opts = {
+    .ownership = VCTRS_OWNERSHIP_foreign,
+    .recursively_proxied = false
+  };
+
   const r_ssize out_size = indices_out_size(p_indices, x);
   r_obj* out = KEEP(r_alloc_list(out_size));
 
   for (r_ssize i = 0; i < out_size; ++i) {
     r_obj* index = indices_next(p_indices);
 
-    if (is_compact(index)) {
-      index = compact_materialize(index);
-    }
-    KEEP(index);
+    index = KEEP(vec_subscript_materialize(index));
 
     // Update `i` binding with the new index value
     r_env_poke(env, syms_i, index);
@@ -438,7 +467,8 @@ r_obj* chop_fallback(r_obj* x, struct vctrs_chop_indices* p_indices) {
     r_obj* elt = KEEP(r_eval(call, env));
 
     if (!vec_is_restored(elt, x)) {
-      elt = vec_restore(elt, x, vec_owned(elt));
+      // No guarantee that we own `elt` here
+      elt = vec_restore_opts(elt, x, &elt_restore_opts);
     }
 
     r_list_poke(out, i, elt);
@@ -457,10 +487,7 @@ r_obj* chop_fallback_shaped(r_obj* x, struct vctrs_chop_indices* p_indices) {
   for (r_ssize i = 0; i < out_size; ++i) {
     r_obj* index = indices_next(p_indices);
 
-    if (is_compact(index)) {
-      index = compact_materialize(index);
-    }
-    KEEP(index);
+    index = KEEP(vec_subscript_materialize(index));
 
     // `vec_slice_fallback()` will also `vec_restore()` for us
     r_obj* elt = vec_slice_fallback(x, index);
@@ -475,7 +502,7 @@ r_obj* chop_fallback_shaped(r_obj* x, struct vctrs_chop_indices* p_indices) {
 
 // -----------------------------------------------------------------------------
 
-r_obj* list_as_locations(r_obj* indices, r_ssize n, r_obj* names) {
+r_obj* list_as_locations(r_obj* indices, r_ssize n, r_obj* names, bool allow_compact) {
   if (r_typeof(indices) != R_TYPE_list) {
     r_abort_lazy_call(r_lazy_null, "`indices` must be a list of index values, or `NULL`.");
   }
@@ -486,6 +513,7 @@ r_obj* list_as_locations(r_obj* indices, r_ssize n, r_obj* names) {
   r_obj* const* v_indices = r_list_cbegin(indices);
 
   // Restrict index values to positive integer locations
+  // Also, notably, the `index` vector can't change size, i.e. `0` and `NA` aren't dropped.
   const struct location_opts opts = {
     .subscript_opts = {
       .logical = SUBSCRIPT_TYPE_ACTION_ERROR,
@@ -500,6 +528,18 @@ r_obj* list_as_locations(r_obj* indices, r_ssize n, r_obj* names) {
 
   for (r_ssize i = 0; i < size; ++i) {
     r_obj* index = v_indices[i];
+
+    if (is_compact_seq(index)) {
+      if (allow_compact) {
+        // Allow `compact_seq` to pass through untouched,
+        // assume caller can handle them natively
+        continue;
+      } else {
+        // We don't want them to slip through when not handled natively
+        r_stop_internal("`compact_seq` are not allowed.");
+      }
+    }
+
     index = vec_as_location_opts(index, n, names, &opts);
     r_list_poke(indices, i, index);
   }

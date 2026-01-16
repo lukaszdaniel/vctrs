@@ -1,4 +1,3 @@
-
 test_that("basic assert is idempotent", {
   x <- new_vctr(1:4)
 
@@ -167,9 +166,31 @@ test_that("obj_check_vector() error respects `arg` and `call`", {
   })
 })
 
+test_that("obj_check_vector() error contains FAQ links and correct bullets", {
+  # Expect to see:
+  # - Link to general FAQ about scalar types
+  x <- expression()
+  expect_snapshot(error = TRUE, obj_check_vector(x))
+
+  # Expect to see:
+  # - Bullet about incompatible S3 list
+  # - Full class list
+  # - Link to specific FAQ about creating vectors
+  x <- structure(list(), class = "my_list")
+  expect_snapshot(error = TRUE, obj_check_vector(x))
+
+  # Expect to see:
+  # - Bullet about incompatible data frame
+  # - Full class list
+  # - Link to specific FAQ about creating vectors
+  x <- data_frame(a = 1)
+  class(x) <- c("data.frame", "my_df")
+  expect_snapshot(error = TRUE, obj_check_vector(x))
+})
+
 test_that("vec_assert() uses friendly type in error messages", {
-   # Friendly type will be generated in rlang in the future. Upstream
-   # changes should not cause CRAN failures.
+  # Friendly type will be generated in rlang in the future. Upstream
+  # changes should not cause CRAN failures.
   skip_on_cran()
   expect_error(vec_assert(function() NULL), class = "vctrs_error_scalar_type")
 })
@@ -218,7 +239,10 @@ test_that("unspecified is finalised before assertion", {
   expect_true(vec_is(data.frame(x = NA), data.frame(x = lgl())))
 
   expect_error(regexp = NA, vec_assert(NA, TRUE))
-  expect_error(regexp = NA, vec_assert(data.frame(x = NA), data.frame(x = lgl())))
+  expect_error(
+    regexp = NA,
+    vec_assert(data.frame(x = NA), data.frame(x = lgl()))
+  )
 })
 
 test_that("assertion failures are explained", {
@@ -229,7 +253,10 @@ test_that("assertion failures are explained", {
 
   expect_snapshot(error = TRUE, vec_assert(lgl(), factor()))
   expect_snapshot(error = TRUE, vec_assert(lgl(), factor(levels = "foo")))
-  expect_snapshot(error = TRUE, vec_assert(factor(levels = "bar"), factor(levels = "foo")))
+  expect_snapshot(
+    error = TRUE,
+    vec_assert(factor(levels = "bar"), factor(levels = "foo"))
+  )
 
   expect_snapshot(error = TRUE, vec_assert(factor(), chr()))
 
@@ -240,13 +267,25 @@ test_that("assertion failures are explained", {
   expect_snapshot(error = TRUE, vec_assert(data.frame(), chr()))
 
   expect_snapshot(error = TRUE, vec_assert(data.frame(x = 1), chr()))
-  expect_snapshot(error = TRUE, vec_assert(data.frame(x = 1), data.frame(x = "foo")))
-  expect_snapshot(error = TRUE, vec_assert(data.frame(x = 1), data.frame(x = "foo", y = 2)))
+  expect_snapshot(
+    error = TRUE,
+    vec_assert(data.frame(x = 1), data.frame(x = "foo"))
+  )
+  expect_snapshot(
+    error = TRUE,
+    vec_assert(data.frame(x = 1), data.frame(x = "foo", y = 2))
+  )
 
   expect_snapshot(error = TRUE, vec_assert(data.frame(x = 1, y = 2), chr()))
 
-  expect_snapshot(error = TRUE, vec_assert(data.frame(x = 1, y = 2), data.frame(x = "foo")))
-  expect_snapshot(error = TRUE, vec_assert(data.frame(x = 1, y = 2), data.frame(x = "foo", y = 2)))
+  expect_snapshot(
+    error = TRUE,
+    vec_assert(data.frame(x = 1, y = 2), data.frame(x = "foo"))
+  )
+  expect_snapshot(
+    error = TRUE,
+    vec_assert(data.frame(x = 1, y = 2), data.frame(x = "foo", y = 2))
+  )
 })
 
 test_that("vec_assert() validates `size` (#1470)", {
@@ -319,7 +358,59 @@ test_that("vec_check_size() validates `size`", {
   })
 })
 
-# obj_is_list -----------------------------------------------------------
+# vec_check_recyclable --------------------------------------------------------
+
+test_that("vec_check_recyclable() is silent if the size is right", {
+  expect_null(vec_check_recyclable(1:5, size = 5L))
+  expect_null(vec_check_recyclable(1, size = 5L))
+  expect_null(vec_check_recyclable(data_frame(.size = 10L), size = 10L))
+  expect_null(vec_check_recyclable(data_frame(.size = 1L), size = 10L))
+})
+
+test_that("vec_check_recyclable() errors on the wrong size", {
+  expect_snapshot(error = TRUE, {
+    vec_check_recyclable(1:5, size = 1L)
+  })
+  expect_snapshot(error = TRUE, {
+    vec_check_recyclable(1:5, size = 10L)
+  })
+})
+
+test_that("vec_check_recyclable() errors on scalars", {
+  expect_snapshot(error = TRUE, {
+    vec_check_recyclable(quote(foo), size = 1L)
+  })
+  expect_snapshot(error = TRUE, {
+    vec_check_recyclable(foobar(), size = 1L)
+  })
+})
+
+test_that("vec_check_recyclable() error respects `arg` and `call`", {
+  my_check_recyclable <- function(foo, size) {
+    vec_check_recyclable(foo, size)
+  }
+
+  expect_snapshot(error = TRUE, {
+    my_check_recyclable(1:2, size = 5L)
+  })
+  expect_snapshot(error = TRUE, {
+    my_check_recyclable(foobar(), size = 5L)
+  })
+})
+
+test_that("vec_check_recyclable() validates `size`", {
+  expect_snapshot(error = TRUE, {
+    vec_check_recyclable(1, size = "x")
+  })
+  expect_snapshot(error = TRUE, {
+    vec_check_recyclable(1, size = c(1L, 2L))
+  })
+  expect_snapshot(error = TRUE, {
+    vec_check_recyclable(1, size = 1.5)
+  })
+})
+
+# obj_is_list and friends -----------------------------------------------
 
 test_that("bare lists are lists", {
   expect_true(obj_is_list(list()))
@@ -339,6 +430,16 @@ test_that("Vectors with a non-VECSXP type are not lists", {
   expect_false(obj_is_list(1))
   expect_false(obj_is_list("a"))
   expect_false(obj_is_list(quote(name)))
+})
+
+test_that("List arrays are not lists", {
+  # Bare list arrays
+  x <- array(list(1))
+  expect_false(obj_is_list(x))
+
+  # Classed list arrays
+  x <- structure(list(1), class = "list", dim = 1)
+  expect_false(obj_is_list(x))
 })
 
 test_that("explicitly classed lists are lists", {
@@ -467,6 +568,42 @@ test_that("list_check_all_size() works", {
   })
 })
 
+test_that("list_all_recyclable() works", {
+  expect_true(list_all_recyclable(list(), 2))
+  expect_true(list_all_recyclable(list(integer()), 0))
+  expect_true(list_all_recyclable(list(NULL), 0))
+  expect_true(list_all_recyclable(list(1:2, 2:3), 2))
+  expect_true(list_all_recyclable(list(1, 2:3), 2))
+
+  expect_false(list_all_recyclable(list(1:2, 1:3), 2))
+  expect_false(list_all_recyclable(list(NULL, 1:2), 2))
+  expect_false(list_all_recyclable(list(1, 1:2), 1))
+
+  expect_true(list_all_recyclable(list_of(1:3, 2:4), 3))
+  expect_false(list_all_recyclable(list_of(1:3, 2:4), 4))
+})
+
+test_that("list_check_all_recyclable() works", {
+  expect_null(list_check_all_recyclable(list(), 2))
+  expect_null(list_check_all_recyclable(list(integer()), 0))
+  expect_null(list_check_all_recyclable(list(NULL), 0))
+  expect_null(list_check_all_recyclable(list(1:2, 2:3), 2))
+  expect_null(list_check_all_recyclable(list(1, 2:3), 2))
+
+  expect_snapshot({
+    my_function <- function(my_arg, size) {
+      list_check_all_recyclable(my_arg, size)
+    }
+
+    # Validates sizes
+    (expect_error(list_check_all_recyclable(list(1:2, 1:3), 2)))
+    (expect_error(my_function(list(1:2, 1:3), 2)))
+
+    # `NULL` is not ignored
+    (expect_error(my_function(list(NULL, 1:2), 2)))
+  })
+})
+
 test_that("list_all_size() and list_check_all_size() error on scalars", {
   x <- list(env())
 
@@ -475,6 +612,20 @@ test_that("list_all_size() and list_check_all_size() error on scalars", {
     (expect_error(list_all_size(x, 2)))
 
     my_function <- function(my_arg, size) list_check_all_size(my_arg, size)
+    (expect_error(my_function(x, 2)))
+  })
+})
+
+test_that("list_all_recyclable() and list_check_all_recyclable() error on scalars", {
+  x <- list(env())
+
+  expect_snapshot({
+    # Error considered internal to `list_all_recyclable()`
+    (expect_error(list_all_recyclable(x, 2)))
+
+    my_function <- function(my_arg, size) {
+      list_check_all_recyclable(my_arg, size)
+    }
     (expect_error(my_function(x, 2)))
   })
 })
@@ -493,6 +644,114 @@ test_that("list_all_size() and list_check_all_size() validate `size`", {
     (expect_error(list_all_size(list(), size = "x")))
     (expect_error(list_check_all_size(list(), size = "x")))
   })
+})
+
+test_that("list_all_recyclable() and list_check_all_recyclable() validate `size`", {
+  expect_snapshot({
+    (expect_error(list_all_recyclable(list(), size = "x")))
+    (expect_error(list_check_all_recyclable(list(), size = "x")))
+  })
+})
+
+test_that("list_all_size() works with `allow_null`", {
+  x <- list(1, NULL, 2)
+  expect_false(list_all_size(x, size = 1))
+  expect_true(list_all_size(x, size = 1, allow_null = TRUE))
+
+  x <- list(1, NULL, 2:3)
+  expect_false(list_all_size(x, size = 1))
+  expect_false(list_all_size(x, size = 1, allow_null = TRUE))
+
+  # `NULL` size is 0 by default
+  x <- list(integer(), NULL, integer())
+  expect_true(list_all_size(x, size = 0))
+  expect_true(list_all_size(x, size = 0, allow_null = TRUE))
+})
+
+test_that("list_check_all_size() works with `allow_null`", {
+  x <- list(1, NULL, 2)
+  expect_snapshot(error = TRUE, {
+    list_check_all_size(x, size = 1)
+  })
+  expect_null(list_check_all_size(x, size = 1, allow_null = TRUE))
+
+  # Index of 3rd element is reported correctly
+  x <- list(1, NULL, 2:3)
+  expect_snapshot(error = TRUE, {
+    list_check_all_size(x, size = 1)
+  })
+  expect_snapshot(error = TRUE, {
+    list_check_all_size(x, size = 1, allow_null = TRUE)
+  })
+
+  # `NULL` size is 0 by default
+  x <- list(integer(), NULL, integer())
+  expect_null(list_check_all_size(x, size = 0))
+  expect_null(list_check_all_size(x, size = 0, allow_null = TRUE))
+})
+
+test_that("list_all_vectors() works with `allow_null`", {
+  x <- list(1, NULL, 2)
+  expect_false(list_all_vectors(x))
+  expect_true(list_all_vectors(x, allow_null = TRUE))
+
+  x <- list(1, NULL, environment())
+  expect_false(list_all_vectors(x))
+  expect_false(list_all_vectors(x, allow_null = TRUE))
+})
+
+test_that("list_check_all_vectors() works with `allow_null`", {
+  x <- list(1, NULL, 2)
+  expect_snapshot(error = TRUE, {
+    list_check_all_vectors(x)
+  })
+  expect_null(list_check_all_vectors(x, allow_null = TRUE))
+
+  # Index of 3rd element is reported correctly
+  x <- list(1, NULL, environment())
+  expect_snapshot(error = TRUE, {
+    list_check_all_vectors(x)
+  })
+  expect_snapshot(error = TRUE, {
+    list_check_all_vectors(x, allow_null = TRUE)
+  })
+})
+
+test_that("list_all_recyclable() works with `allow_null`", {
+  x <- list(1, NULL, 2:3)
+  expect_false(list_all_recyclable(x, size = 2))
+  expect_true(list_all_recyclable(x, size = 2, allow_null = TRUE))
+
+  x <- list(1, NULL, 2:4)
+  expect_false(list_all_recyclable(x, size = 2))
+  expect_false(list_all_recyclable(x, size = 2, allow_null = TRUE))
+
+  # `NULL` size is 0 by default
+  x <- list(integer(), NULL, integer())
+  expect_true(list_all_recyclable(x, size = 0))
+  expect_true(list_all_recyclable(x, size = 0, allow_null = TRUE))
+})
+
+test_that("list_check_all_recyclable() works with `allow_null`", {
+  x <- list(1, NULL, 2:3)
+  expect_snapshot(error = TRUE, {
+    list_check_all_recyclable(x, size = 2)
+  })
+  expect_null(list_check_all_recyclable(x, size = 2, allow_null = TRUE))
+
+  # Index of 3rd element is reported correctly
+  x <- list(1, NULL, 2:4)
+  expect_snapshot(error = TRUE, {
+    list_check_all_recyclable(x, size = 2)
+  })
+  expect_snapshot(error = TRUE, {
+    list_check_all_recyclable(x, size = 2, allow_null = TRUE)
+  })
+
+  # `NULL` size is 0 by default
+  x <- list(integer(), NULL, integer())
+  expect_null(list_check_all_recyclable(x, size = 0))
+  expect_null(list_check_all_recyclable(x, size = 0, allow_null = TRUE))
 })
 
 test_that("informative messages when 1d array doesn't match vector", {

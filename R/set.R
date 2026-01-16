@@ -16,8 +16,8 @@
 #' input. Names of `x` and `y` are retained on the result, but names are always
 #' taken from `x` if the value appears in both inputs.
 #'
-#' These functions work similarly to [intersect()], [setdiff()], and [union()],
-#' but don't strip attributes and can be used with data frames.
+#' These functions work similarly to [base::intersect()], [base::setdiff()], and
+#' [base::union()], but don't strip attributes and can be used with data frames.
 #'
 #' @inheritParams rlang::args_dots_empty
 #' @inheritParams rlang::args_error_context
@@ -115,53 +115,60 @@ NULL
 
 #' @rdname vec-set
 #' @export
-vec_set_intersect <- function(x,
-                              y,
-                              ...,
-                              ptype = NULL,
-                              x_arg = "x",
-                              y_arg = "y",
-                              error_call = current_env()) {
+vec_set_intersect <- function(
+  x,
+  y,
+  ...,
+  ptype = NULL,
+  x_arg = "x",
+  y_arg = "y",
+  error_call = current_env()
+) {
   check_dots_empty0(...)
   .Call(ffi_vec_set_intersect, x, y, ptype, environment())
 }
 
 #' @rdname vec-set
 #' @export
-vec_set_difference <- function(x,
-                               y,
-                               ...,
-                               ptype = NULL,
-                               x_arg = "x",
-                               y_arg = "y",
-                               error_call = current_env()) {
+vec_set_difference <- function(
+  x,
+  y,
+  ...,
+  ptype = NULL,
+  x_arg = "x",
+  y_arg = "y",
+  error_call = current_env()
+) {
   check_dots_empty0(...)
   .Call(ffi_vec_set_difference, x, y, ptype, environment())
 }
 
 #' @rdname vec-set
 #' @export
-vec_set_union <- function(x,
-                          y,
-                          ...,
-                          ptype = NULL,
-                          x_arg = "x",
-                          y_arg = "y",
-                          error_call = current_env()) {
+vec_set_union <- function(
+  x,
+  y,
+  ...,
+  ptype = NULL,
+  x_arg = "x",
+  y_arg = "y",
+  error_call = current_env()
+) {
   check_dots_empty0(...)
   .Call(ffi_vec_set_union, x, y, ptype, environment())
 }
 
 #' @rdname vec-set
 #' @export
-vec_set_symmetric_difference <- function(x,
-                                         y,
-                                         ...,
-                                         ptype = NULL,
-                                         x_arg = "x",
-                                         y_arg = "y",
-                                         error_call = current_env()) {
+vec_set_symmetric_difference <- function(
+  x,
+  y,
+  ...,
+  ptype = NULL,
+  x_arg = "x",
+  y_arg = "y",
+  error_call = current_env()
+) {
   check_dots_empty0(...)
   .Call(ffi_vec_set_symmetric_difference, x, y, ptype, environment())
 }
-

@@ -93,6 +93,22 @@
       ! Can't merge the outer name `foo` with a vector of length > 1.
       Please supply a `.name_spec` specification.
 
+# names of `...` are used for type and cast errors even when zapped
+
+    Code
+      vec_rbind(!!!xs)
+    Condition
+      Error in `vec_rbind()`:
+      ! Can't combine `a$x` <double> and `b$x` <character>.
+
+---
+
+    Code
+      vec_rbind(!!!xs, .ptype = data_frame(x = double()))
+    Condition
+      Error in `vec_rbind()`:
+      ! Can't convert `b$x` <character> to match type of `x` <double>.
+
 # vec_cbind() reports error context
 
     Code
@@ -101,12 +117,18 @@
       <error/vctrs_error_scalar_type>
       Error in `vec_cbind()`:
       ! `..1` must be a vector, not a <vctrs_foobar> object.
+      x Detected incompatible scalar S3 list. To be treated as a vector, the object must explicitly inherit from <list> or should implement a `vec_proxy()` method. Class: <vctrs_foobar>.
+      i If this object comes from a package, please report this error to the package author.
+      i Read our FAQ about creating vector types (`?vctrs::howto_faq_fix_scalar_type_error`) to learn more.
     Code
       (expect_error(vec_cbind(foobar(list()), .error_call = call("foo"))))
     Output
       <error/vctrs_error_scalar_type>
       Error in `foo()`:
       ! `..1` must be a vector, not a <vctrs_foobar> object.
+      x Detected incompatible scalar S3 list. To be treated as a vector, the object must explicitly inherit from <list> or should implement a `vec_proxy()` method. Class: <vctrs_foobar>.
+      i If this object comes from a package, please report this error to the package author.
+      i Read our FAQ about creating vector types (`?vctrs::howto_faq_fix_scalar_type_error`) to learn more.
     Code
       (expect_error(vec_cbind(a = 1:2, b = int())))
     Output
@@ -165,19 +187,20 @@
 # can supply `.names_to` to `vec_rbind()` (#229)
 
     Code
-      (expect_error(vec_rbind(.names_to = letters)))
+      (expect_error(vec_rbind(data_frame(), .names_to = letters)))
     Output
       <error/rlang_error>
       Error in `vec_rbind()`:
       ! `.names_to` must be `NULL`, a string, or an `rlang::zap()` object.
     Code
-      (expect_error(vec_rbind(.names_to = 10)))
+      (expect_error(vec_rbind(data_frame(), .names_to = 10)))
     Output
       <error/rlang_error>
       Error in `vec_rbind()`:
       ! `.names_to` must be `NULL`, a string, or an `rlang::zap()` object.
     Code
-      (expect_error(vec_rbind(.names_to = letters, .error_call = call("foo"))))
+      (expect_error(vec_rbind(data_frame(), .names_to = letters, .error_call = call(
+        "foo"))))
     Output
       <error/rlang_error>
       Error in `foo()`:
@@ -402,22 +425,6 @@
       Error in `vec_rbind()`:
       ! Can't combine `..1` <vctrs_Counts> and `..2` <vctrs:::common_class_fallback>.
 
-# can't zap names when `.names_to` is supplied
-
-    Code
-      (expect_error(vec_rbind(foo = c(x = 1), .names_to = "id", .name_spec = zap())))
-    Output
-      <error/rlang_error>
-      Error in `vec_rbind()`:
-      ! Can't zap outer names when `.names_to` is supplied.
-    Code
-      (expect_error(vec_rbind(foo = c(x = 1), .names_to = "id", .name_spec = zap(),
-      .error_call = call("foo"))))
-    Output
-      <error/rlang_error>
-      Error in `foo()`:
-      ! Can't zap outer names when `.names_to` is supplied.
-
 # row-binding performs expected allocations
 
     Code
@@ -426,11 +433,11 @@
       # Integers as rows
       suppressMessages(with_memory_prof(vec_rbind_list(ints)))
     Output
-      [1] 2.79KB
+      [1] 2.74KB
     Code
       suppressMessages(with_memory_prof(vec_rbind_list(named_ints)))
     Output
-      [1] 3.66KB
+      [1] 3.62KB
     Code
       # Data frame with named columns
       df <- data_frame(x = set_names(as.list(1:2), c("a", "b")), y = set_names(1:2, c(
@@ -446,7 +453,7 @@
       dfs <- map2(dfs, seq_along(dfs), set_rownames_recursively)
       with_memory_prof(vec_rbind_list(dfs))
     Output
-      [1] 7.68KB
+      [1] 7.63KB
     Code
       # Data frame with rownames (repaired, non-recursive case)
       dfs <- map(dfs, set_rownames_recursively)

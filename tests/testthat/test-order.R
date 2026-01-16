@@ -71,30 +71,54 @@ test_that("all `NA` values works", {
 
 test_that("can order when in expected order", {
   x <- c(1L, 1L, 2L, NA, NA)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "largest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "largest"),
+    1:5
+  )
 
   x <- c(NA, NA, 3L, 3L, 2L)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "largest"),
+    1:5
+  )
 
   x <- c(NA, NA, 1L, 1L, 2L)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "smallest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "smallest"),
+    1:5
+  )
 
   x <- c(3L, 3L, 2L, NA, NA)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "smallest"),
+    1:5
+  )
 })
 
 test_that("can order when in strictly opposite of expected order (no ties)", {
   x <- c(NA, 2L, 1L)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "largest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "largest"),
+    3:1
+  )
 
   x <- c(1L, 2L, NA)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "largest"),
+    3:1
+  )
 
   x <- c(2L, 1L, NA)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "smallest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "smallest"),
+    3:1
+  )
 
   x <- c(NA, 1L, 2L)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "smallest"),
+    3:1
+  )
 })
 
 # ------------------------------------------------------------------------------
@@ -115,7 +139,10 @@ test_that("can order sorted vector", {
 
 test_that("ordering on ties is done stably", {
   x <- c(1:ORDER_INSERTION_BOUNDARY, 1L)
-  expect_identical(vec_order_radix(x)[1:2], c(1L, ORDER_INSERTION_BOUNDARY + 1L))
+  expect_identical(
+    vec_order_radix(x)[1:2],
+    c(1L, ORDER_INSERTION_BOUNDARY + 1L)
+  )
 })
 
 test_that("all combinations of `direction` and `na_value` work", {
@@ -157,11 +184,21 @@ test_that("can order sorted vector", {
 
 test_that("ordering on ties is done stably", {
   x <- c(1:ORDER_INSERTION_BOUNDARY, 1L, INT_ORDER_COUNTING_RANGE_BOUNDARY + 1L)
-  expect_identical(vec_order_radix(x)[1:2], c(1L, ORDER_INSERTION_BOUNDARY + 1L))
+  expect_identical(
+    vec_order_radix(x)[1:2],
+    c(1L, ORDER_INSERTION_BOUNDARY + 1L)
+  )
 })
 
 test_that("all combinations of `direction` and `na_value` work", {
-  x <- c(3L, NA_integer_, 1L, 2L, 1:ORDER_INSERTION_BOUNDARY, INT_ORDER_COUNTING_RANGE_BOUNDARY + 1L)
+  x <- c(
+    3L,
+    NA_integer_,
+    1L,
+    2L,
+    1:ORDER_INSERTION_BOUNDARY,
+    INT_ORDER_COUNTING_RANGE_BOUNDARY + 1L
+  )
 
   expect_identical(
     x[vec_order_radix(x, na_value = "largest", direction = "asc")],
@@ -184,19 +221,28 @@ test_that("all combinations of `direction` and `na_value` work", {
 test_that("can order all 1 value", {
   x <- rep(1L, ORDER_INSERTION_BOUNDARY + 1L)
   expect_identical(vec_order_radix(x), base_order(x))
-  expect_identical(vec_order_radix(x, direction = "desc"), base_order(x, decreasing = TRUE))
+  expect_identical(
+    vec_order_radix(x, direction = "desc"),
+    base_order(x, decreasing = TRUE)
+  )
 })
 
 test_that("all `NA` values works - ensures that we can compute the 'range' of all NAs", {
   x <- rep(NA_integer_, ORDER_INSERTION_BOUNDARY + 1L)
   expect_identical(vec_order_radix(x), base_order(x))
-  expect_identical(vec_order_radix(x, direction = "desc"), base_order(x, decreasing = TRUE))
+  expect_identical(
+    vec_order_radix(x, direction = "desc"),
+    base_order(x, decreasing = TRUE)
+  )
 })
 
 test_that("can order with many NAs first", {
   x <- c(rep(NA_integer_, ORDER_INSERTION_BOUNDARY + 1L), 2L)
   expect_identical(vec_order_radix(x), base_order(x))
-  expect_identical(vec_order_radix(x, na_value = "smallest"), base_order(x, na.last = FALSE))
+  expect_identical(
+    vec_order_radix(x, na_value = "smallest"),
+    base_order(x, na.last = FALSE)
+  )
 })
 
 test_that("subtraction in counting order range computation works correctly (#1399)", {
@@ -324,67 +370,187 @@ test_that("double: -0 and 0 order identically / stably", {
 
 test_that("can order when in expected order", {
   x <- c(1, 1, 2, NA, NaN)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "largest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "largest"),
+    1:5
+  )
 
   x <- c(NA, NaN, 3, 3, 2)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "largest"),
+    1:5
+  )
 
   x <- c(NA, NaN, 1, 1, 2)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "smallest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "smallest"),
+    1:5
+  )
 
   x <- c(3, 3, 2, NA, NaN)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "smallest"),
+    1:5
+  )
 })
 
 test_that("can order when in expected order - using distinct NaN values", {
   x <- c(1, 1, 2, NaN, NA)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "largest", nan_distinct = TRUE), 1:5)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    1:5
+  )
 
   x <- c(NA, NaN, 3, 3, 2)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest", nan_distinct = TRUE), 1:5)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    1:5
+  )
 
   x <- c(NA, NaN, 1, 1, 2)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "smallest", nan_distinct = TRUE), 1:5)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    1:5
+  )
 
   x <- c(3, 3, 2, NaN, NA)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest", nan_distinct = TRUE), 1:5)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    1:5
+  )
 })
 
 test_that("can order when in strictly opposite of expected order (no ties)", {
   x <- c(NA, 2, 1)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "largest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "largest"),
+    3:1
+  )
 
   x <- c(1, 2, NA)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "largest"),
+    3:1
+  )
 
   x <- c(2, 1, NA)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "smallest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "smallest"),
+    3:1
+  )
 
   x <- c(NA, 1, 2)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "smallest"),
+    3:1
+  )
 })
 
 test_that("can order when in strictly opposite of expected order (no ties) - using distinct NaN values", {
   x <- c(NA, NaN, 2, 1)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "largest", nan_distinct = TRUE), 4:1)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    4:1
+  )
 
   x <- c(1, 2, NaN, NA)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest", nan_distinct = TRUE), 4:1)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    4:1
+  )
 
   x <- c(2, 1, NaN, NA)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "smallest", nan_distinct = TRUE), 4:1)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    4:1
+  )
 
   x <- c(NA, NaN, 1, 2)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest", nan_distinct = TRUE), 4:1)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    4:1
+  )
 })
 
 test_that("NaN is always placed next to numbers when treated as distinct", {
   x <- c(1, 2, NA, NaN)
 
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "largest", nan_distinct = TRUE), c(1L, 2L, 4L, 3L))
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "smallest", nan_distinct = TRUE), c(3L, 4L, 1L, 2L))
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest", nan_distinct = TRUE), c(3L, 4L, 2L, 1L))
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest", nan_distinct = TRUE), c(2L, 1L, 4L, 3L))
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    c(1L, 2L, 4L, 3L)
+  )
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    c(3L, 4L, 1L, 2L)
+  )
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    c(3L, 4L, 2L, 1L)
+  )
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    c(2L, 1L, 4L, 3L)
+  )
 })
 
 # ------------------------------------------------------------------------------
@@ -405,7 +571,10 @@ test_that("can order sorted vector", {
 
 test_that("ordering on ties is done stably", {
   x <- c(1:ORDER_INSERTION_BOUNDARY, 1L) + 0
-  expect_identical(vec_order_radix(x)[1:2], c(1L, ORDER_INSERTION_BOUNDARY + 1L))
+  expect_identical(
+    vec_order_radix(x)[1:2],
+    c(1L, ORDER_INSERTION_BOUNDARY + 1L)
+  )
 })
 
 test_that("all combinations of `direction` and `na_value` work", {
@@ -446,20 +615,38 @@ test_that("NA_real_ and NaN can be considered distinct with `nan_distinct`", {
   loc_nan <- seq(2L, length(x), by = 2L)
   loc_na <- seq(1L, length(x), by = 2L)
 
-  expect_identical(vec_order_radix(x, na_value = "largest", nan_distinct = TRUE), c(loc_nan, loc_na))
-  expect_identical(vec_order_radix(x, na_value = "smallest", nan_distinct = TRUE), c(loc_na, loc_nan))
+  expect_identical(
+    vec_order_radix(x, na_value = "largest", nan_distinct = TRUE),
+    c(loc_nan, loc_na)
+  )
+  expect_identical(
+    vec_order_radix(x, na_value = "smallest", nan_distinct = TRUE),
+    c(loc_na, loc_nan)
+  )
 })
 
 test_that("-Inf / Inf order correctly", {
   x <- c(rep(0, ORDER_INSERTION_BOUNDARY), -Inf, Inf)
-  expect_identical(vec_order_radix(x, direction = "asc"), order(x, decreasing = FALSE))
-  expect_identical(vec_order_radix(x, direction = "desc"), order(x, decreasing = TRUE))
+  expect_identical(
+    vec_order_radix(x, direction = "asc"),
+    order(x, decreasing = FALSE)
+  )
+  expect_identical(
+    vec_order_radix(x, direction = "desc"),
+    order(x, decreasing = TRUE)
+  )
 })
 
 test_that("double, large: -0 and 0 order identically / stably", {
   x <- c(rep(0, ORDER_INSERTION_BOUNDARY), -0)
-  expect_identical(vec_order_radix(x, direction = "desc"), order(x, decreasing = TRUE))
-  expect_identical(vec_order_radix(x, direction = "asc"), order(x, decreasing = FALSE))
+  expect_identical(
+    vec_order_radix(x, direction = "desc"),
+    order(x, decreasing = TRUE)
+  )
+  expect_identical(
+    vec_order_radix(x, direction = "asc"),
+    order(x, decreasing = FALSE)
+  )
 })
 
 # ------------------------------------------------------------------------------
@@ -513,6 +700,47 @@ test_that("can be used in a data frame", {
   expect_identical(vec_order_radix(df3), c(5L, 3L, 1L, 2L, 4L))
 })
 
+test_that("can be used in a data frame when all group sizes are >1", {
+  # https://github.com/tidyverse/dplyr/issues/7708
+
+  # Group sizes of 3 (1L) and 2 (2L)
+  x <- c(1L, 2L, 1L, 2L, 1L)
+
+  y <- complex(
+    # Group sizes of 3 (1L, 1L) and 2 (2L, 2L)
+    real = c(1L, 2L, 1L, 2L, 1L),
+    # This breaks ties within each group
+    imaginary = c(3L, 2L, 2L, 4L, 1L)
+  )
+
+  df <- data.frame(x = x, y = y)
+
+  expect_identical(vec_order_radix(df), c(5L, 3L, 1L, 2L, 4L))
+})
+
+test_that("can be used in a data frame as the third column", {
+  # Testing that `complex_first_pass` is reset between columns
+
+  x <- c(1L, 1L, 1L, 2L, 2L)
+
+  y <- complex(
+    real = x,
+    # This breaks one tie
+    imaginary = c(1L, 2L, 1L, 2L, 2L)
+  )
+
+  z <- complex(
+    # This breaks one tie
+    real = c(3L, 2L, 1L, 2L, 2L),
+    # This breaks one tie
+    imaginary = c(3L, 2L, 1L, 2L, 1L)
+  )
+
+  df <- data.frame(x = x, y = y, z = z)
+
+  expect_identical(vec_order_radix(df), c(3L, 1L, 2L, 5L, 4L))
+})
+
 test_that("all combinations of `direction` and `na_value` work", {
   x <- complex(real = c(3, NA, 1.5, 2, NA), imaginary = c(1, 1, 1, 1, 2))
 
@@ -538,39 +766,167 @@ test_that("all combinations of `direction` and `na_value` work", {
 
 test_that("full gambit of tests involving missing values are working as expected (#1403)", {
   x <- complex(
-    real      = c(NaN, NA, NA,  NA, NaN, NaN, 1,  1,   1, 2),
-    imaginary = c(NA,  NA, NaN, 1,  NaN, 1,   NA, NaN, 1, NA)
+    real = c(NaN, NA, NA, NA, NaN, NaN, 1, 1, 1, 2),
+    imaginary = c(NA, NA, NaN, 1, NaN, 1, NA, NaN, 1, NA)
   )
 
   df <- data_frame(a = rep(1L, length(x)), x = x)
 
   # {number}, {NaN}, {NaN + NA}, {NA + NaN}, {NA}
-  expect <- c(9L,  5L, 6L, 8L,  1L,  3L,  2L, 4L, 7L, 10L)
-  expect_identical(vec_order_radix(x, direction = "asc",  na_value = "largest",  nan_distinct = TRUE), expect)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest", nan_distinct = TRUE), expect)
-  expect_identical(vec_order_radix(df, direction = "asc",  na_value = "largest",  nan_distinct = TRUE), expect)
-  expect_identical(vec_order_radix(df, direction = "desc", na_value = "smallest", nan_distinct = TRUE), expect)
+  expect <- c(9L, 5L, 6L, 8L, 1L, 3L, 2L, 4L, 7L, 10L)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      df,
+      direction = "asc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      df,
+      direction = "desc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    expect
+  )
 
   # {NA}, {NA + NaN}, {NaN + NA}, {NaN}, {number}
-  expect <- c(2L, 4L, 7L, 10L,  3L,  1L,  5L, 6L, 8L,  9L)
-  expect_identical(vec_order_radix(x, direction = "asc",  na_value = "smallest", nan_distinct = TRUE), expect)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest",  nan_distinct = TRUE), expect)
-  expect_identical(vec_order_radix(df, direction = "asc",  na_value = "smallest", nan_distinct = TRUE), expect)
-  expect_identical(vec_order_radix(df, direction = "desc", na_value = "largest",  nan_distinct = TRUE), expect)
+  expect <- c(2L, 4L, 7L, 10L, 3L, 1L, 5L, 6L, 8L, 9L)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      df,
+      direction = "asc",
+      na_value = "smallest",
+      nan_distinct = TRUE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      df,
+      direction = "desc",
+      na_value = "largest",
+      nan_distinct = TRUE
+    ),
+    expect
+  )
 
   # {number}, {NA or NaN}
   expect <- c(9L, 1:7, 8L, 10L)
-  expect_identical(vec_order_radix(x, direction = "asc",  na_value = "largest",  nan_distinct = FALSE), expect)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest", nan_distinct = FALSE), expect)
-  expect_identical(vec_order_radix(df, direction = "asc",  na_value = "largest",  nan_distinct = FALSE), expect)
-  expect_identical(vec_order_radix(df, direction = "desc", na_value = "smallest", nan_distinct = FALSE), expect)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "largest",
+      nan_distinct = FALSE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "smallest",
+      nan_distinct = FALSE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      df,
+      direction = "asc",
+      na_value = "largest",
+      nan_distinct = FALSE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      df,
+      direction = "desc",
+      na_value = "smallest",
+      nan_distinct = FALSE
+    ),
+    expect
+  )
 
   # {NA or NaN}, {number}
   expect <- c(1:8, 10L, 9L)
-  expect_identical(vec_order_radix(x, direction = "asc",  na_value = "smallest", nan_distinct = FALSE), expect)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest",  nan_distinct = FALSE), expect)
-  expect_identical(vec_order_radix(df, direction = "asc",  na_value = "smallest", nan_distinct = FALSE), expect)
-  expect_identical(vec_order_radix(df, direction = "desc", na_value = "largest",  nan_distinct = FALSE), expect)
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "asc",
+      na_value = "smallest",
+      nan_distinct = FALSE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      x,
+      direction = "desc",
+      na_value = "largest",
+      nan_distinct = FALSE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      df,
+      direction = "asc",
+      na_value = "smallest",
+      nan_distinct = FALSE
+    ),
+    expect
+  )
+  expect_identical(
+    vec_order_radix(
+      df,
+      direction = "desc",
+      na_value = "largest",
+      nan_distinct = FALSE
+    ),
+    expect
+  )
 })
 
 # ------------------------------------------------------------------------------
@@ -637,6 +993,11 @@ test_that("all `NA` values works", {
   expect_identical(vec_order_radix(x), order(x))
 })
 
+test_that("all `''` values works", {
+  x <- c("", "")
+  expect_identical(vec_order_radix(x), order(x))
+})
+
 test_that("can order empty string vs ASCII value 1 'Start of Header'", {
   x <- c("\001", "")
   expect_identical(vec_order_radix(x), c(2L, 1L))
@@ -683,30 +1044,54 @@ test_that("can order with varying encodings by converting to UTF-8", {
 
 test_that("can order when in expected order", {
   x <- c("a", "a", "b", NA, NA)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "largest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "largest"),
+    1:5
+  )
 
   x <- c(NA, NA, "c", "c", "b")
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "largest"),
+    1:5
+  )
 
   x <- c(NA, NA, "a", "a", "b")
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "smallest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "smallest"),
+    1:5
+  )
 
   x <- c("c", "c", "b", NA, NA)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest"), 1:5)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "smallest"),
+    1:5
+  )
 })
 
 test_that("can order when in strictly opposite of expected order (no ties)", {
   x <- c(NA, "b", "a")
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "largest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "largest"),
+    3:1
+  )
 
   x <- c("a", "b", NA)
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "largest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "largest"),
+    3:1
+  )
 
   x <- c("b", "a", NA)
-  expect_identical(vec_order_radix(x, direction = "asc", na_value = "smallest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "smallest"),
+    3:1
+  )
 
   x <- c(NA, "a", "b")
-  expect_identical(vec_order_radix(x, direction = "desc", na_value = "smallest"), 3:1)
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "smallest"),
+    3:1
+  )
 })
 
 # ------------------------------------------------------------------------------
@@ -734,12 +1119,107 @@ test_that("`NA` order defaults to last", {
 test_that("character, large: `NA` order can be first", {
   x <- paste0("x", seq(1L, ORDER_INSERTION_BOUNDARY + 1L))
   x <- c(x, NA_character_, "y")
-  expect_identical(vec_order_radix(x, na_value = "smallest")[[1L]], length(x) - 1L)
+  expect_identical(
+    vec_order_radix(x, na_value = "smallest")[[1L]],
+    length(x) - 1L
+  )
 })
 
 test_that("character, large: `direction` can be set to `desc`", {
   x <- paste0("x", seq(1L, ORDER_INSERTION_BOUNDARY + 1L))
-  expect_identical(vec_order_radix(x, direction = "desc"), base_order(x, decreasing = TRUE))
+  expect_identical(
+    vec_order_radix(x, direction = "desc"),
+    base_order(x, decreasing = TRUE)
+  )
+})
+
+test_that("after `NA` removal, all `''` works", {
+  # `NA` prevents it from looking sorted to start with
+  x <- rep("", ORDER_INSERTION_BOUNDARY + 1L)
+  x <- c(NA, x, NA)
+
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "largest"),
+    base_order(x, na.last = TRUE, decreasing = FALSE)
+  )
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "largest"),
+    base_order(x, na.last = FALSE, decreasing = TRUE)
+  )
+  expect_identical(
+    vec_order_radix(x, direction = "asc", na_value = "smallest"),
+    base_order(x, na.last = FALSE, decreasing = FALSE)
+  )
+  expect_identical(
+    vec_order_radix(x, direction = "desc", na_value = "smallest"),
+    base_order(x, na.last = TRUE, decreasing = TRUE)
+  )
+
+  # `""` coming through as a "chunk"
+  y <- vec_rep_each(c("a", "b", "c", "d", "e"), length(x))
+  x <- vec_rep(x, 5)
+  df <- data_frame(y = y, x = x)
+
+  expect_identical(
+    vec_order_radix(df, direction = "asc", na_value = "largest"),
+    base_order(df, na.last = TRUE, decreasing = FALSE)
+  )
+  expect_identical(
+    vec_order_radix(df, direction = "desc", na_value = "largest"),
+    base_order(df, na.last = FALSE, decreasing = TRUE)
+  )
+  expect_identical(
+    vec_order_radix(df, direction = "asc", na_value = "smallest"),
+    base_order(df, na.last = FALSE, decreasing = FALSE)
+  )
+  expect_identical(
+    vec_order_radix(df, direction = "desc", na_value = "smallest"),
+    base_order(df, na.last = TRUE, decreasing = TRUE)
+  )
+})
+
+test_that("mixing `''` with other strings works", {
+  x <- rep("", ORDER_INSERTION_BOUNDARY + 1L)
+  x <- c("xyz", x, "abc", "xyz", "a")
+
+  expect_identical(
+    vec_order_radix(x, direction = "asc"),
+    base_order(x, decreasing = FALSE)
+  )
+  expect_identical(
+    vec_order_radix(x, direction = "desc"),
+    base_order(x, decreasing = TRUE)
+  )
+
+  x <- rep(c("xyz", "abc", "xyz"), ORDER_INSERTION_BOUNDARY + 1L)
+  x <- c("", x, "")
+
+  expect_identical(
+    vec_order_radix(x, direction = "asc"),
+    base_order(x, decreasing = FALSE)
+  )
+  expect_identical(
+    vec_order_radix(x, direction = "desc"),
+    base_order(x, decreasing = TRUE)
+  )
+})
+
+test_that("we aren't indexing past an individual string", {
+  # This is why the `\0` check is practically important
+  # - `max_string_size = 3`
+  # - After `pass = 0` we learn nothing
+  # - After `pass = 1` we have two groups:
+  #   - byte b: `"abc\0"`, `"abd\0"`
+  #   - byte \0: `"a\0"`
+  # - We refuse to recurse further into the `\0` byte group, otherwise we'd
+  #   index OOB
+  x <- c(
+    "abc",
+    "abd",
+    rep("a", ORDER_INSERTION_BOUNDARY + 1)
+  )
+
+  expect_identical(vec_order_radix(x), base_order(x))
 })
 
 test_that("all combinations of `direction` and `na_value` work", {
@@ -854,7 +1334,10 @@ test_that("`na_value` is recycled", {
     x = c(1L, 1L, 2L, 2L, NA),
     y = c(3L, 2L, 4L, 1L, NA)
   )
-  expect_identical(vec_order_radix(df, na_value = "smallest"), c(5L, 2L, 1L, 4L, 3L))
+  expect_identical(
+    vec_order_radix(df, na_value = "smallest"),
+    c(5L, 2L, 1L, 4L, 3L)
+  )
 })
 
 test_that("`direction` can be a vector", {
@@ -862,7 +1345,10 @@ test_that("`direction` can be a vector", {
     x = c(1L, 1L, 2L, 2L, NA, 1L),
     y = c(3L, 2L, 4L, 1L, 3L, NA)
   )
-  expect_identical(vec_order_radix(df, direction = c("desc", "asc")), c(5L, 4L, 3L, 2L, 1L, 6L))
+  expect_identical(
+    vec_order_radix(df, direction = c("desc", "asc")),
+    c(5L, 4L, 3L, 2L, 1L, 6L)
+  )
 })
 
 test_that("`na_value` can be a vector", {
@@ -870,7 +1356,10 @@ test_that("`na_value` can be a vector", {
     x = c(1L, 1L, 2L, 2L, NA, NA),
     y = c(3L, 2L, 4L, 1L, NA, 2)
   )
-  expect_identical(vec_order_radix(df, na_value = c("smallest", "largest")), c(6L, 5L, 2L, 1L, 4L, 3L))
+  expect_identical(
+    vec_order_radix(df, na_value = c("smallest", "largest")),
+    c(6L, 5L, 2L, 1L, 4L, 3L)
+  )
 })
 
 test_that("`na_value` and `direction` can both be vectors", {
@@ -880,7 +1369,11 @@ test_that("`na_value` and `direction` can both be vectors", {
   )
 
   expect_identical(
-    vec_order_radix(df, direction = c("desc", "asc"), na_value = c("smallest", "largest")),
+    vec_order_radix(
+      df,
+      direction = c("desc", "asc"),
+      na_value = c("smallest", "largest")
+    ),
     c(4:1, 6:5)
   )
 })
@@ -965,7 +1458,12 @@ test_that("can order 2+ integer column chunks with radix sort", {
 
   df <- data.frame(
     x = 1L,
-    y = c(rep(2L, quarter_low), rep(1L, quarter_high), rep(3L, half), INT_ORDER_COUNTING_RANGE_BOUNDARY + 1L)
+    y = c(
+      rep(2L, quarter_low),
+      rep(1L, quarter_high),
+      rep(3L, half),
+      INT_ORDER_COUNTING_RANGE_BOUNDARY + 1L
+    )
   )
 
   expect_identical(vec_order_radix(df), base_order(df))
@@ -978,7 +1476,12 @@ test_that("can order 2+ double column chunks with radix sort", {
 
   df <- data.frame(
     x = 1,
-    y = c(rep(2, quarter_low), rep(1, quarter_high), rep(3, half), INT_ORDER_COUNTING_RANGE_BOUNDARY + 1)
+    y = c(
+      rep(2, quarter_low),
+      rep(1, quarter_high),
+      rep(3, half),
+      INT_ORDER_COUNTING_RANGE_BOUNDARY + 1
+    )
   )
 
   expect_identical(vec_order_radix(df), base_order(df))
@@ -989,20 +1492,37 @@ test_that("can order 2+ double column chunks with radix sort", {
 
 test_that("`chr_proxy_collate` transforms string input", {
   x <- c("b", "a", "A")
-  expect_identical(vec_order_radix(x, chr_proxy_collate = tolower), c(2L, 3L, 1L))
-  expect_identical(vec_order_radix(x, chr_proxy_collate = ~tolower(.x)), c(2L, 3L, 1L))
+  expect_identical(
+    vec_order_radix(x, chr_proxy_collate = tolower),
+    c(2L, 3L, 1L)
+  )
+  expect_identical(
+    vec_order_radix(x, chr_proxy_collate = ~ tolower(.x)),
+    c(2L, 3L, 1L)
+  )
 })
 
 test_that("`chr_proxy_collate` works with data frame columns and is applied to all string columns", {
   df <- data_frame(x = c(1, 1, 1), y = c("B", "a", "a"), z = c("a", "D", "c"))
-  expect_identical(vec_order_radix(df, chr_proxy_collate = tolower), c(3L, 2L, 1L))
+  expect_identical(
+    vec_order_radix(df, chr_proxy_collate = tolower),
+    c(3L, 2L, 1L)
+  )
 })
 
 test_that("`chr_proxy_collate` is validated", {
-  expect_error(vec_order_radix("x", chr_proxy_collate = 1), "Can't convert `chr_proxy_collate` to a function")
-  expect_error(vec_order_radix("x", chr_proxy_collate = ~c("y", "z")), "1, not 2")
+  expect_error(
+    vec_order_radix("x", chr_proxy_collate = 1),
+    "Can't convert `chr_proxy_collate` to a function"
+  )
+  expect_error(
+    vec_order_radix("x", chr_proxy_collate = ~ c("y", "z")),
+    "1, not 2"
+  )
   expect_error(vec_order_radix("x", chr_proxy_collate = ~1), "character vector")
-  expect_error(vec_order_radix("x", chr_proxy_collate = function() {"y"}))
+  expect_error(vec_order_radix("x", chr_proxy_collate = function() {
+    "y"
+  }))
 })
 
 test_that("`chr_proxy_collate` can return bytes-encoded strings (like `stringi::stri_sort_key()`)", {
@@ -1038,16 +1558,31 @@ test_that("`chr_proxy_collate` can return bytes-encoded strings (like `stringi::
 # vec_order_radix() - error checking
 
 test_that("`na_value` is checked", {
-  expect_error(vec_order_radix(1L, na_value = "x"), "\"largest\" or \"smallest\"")
-  expect_error(vec_order_radix(1L, na_value = c(TRUE, TRUE)), "must be a character vector")
-  expect_error(vec_order_radix(1L, na_value = NA_character_), "can't be missing")
+  expect_error(
+    vec_order_radix(1L, na_value = "x"),
+    "\"largest\" or \"smallest\""
+  )
+  expect_error(
+    vec_order_radix(1L, na_value = c(TRUE, TRUE)),
+    "must be a character vector"
+  )
+  expect_error(
+    vec_order_radix(1L, na_value = NA_character_),
+    "can't be missing"
+  )
 })
 
 test_that("`direction` is checked", {
   expect_error(vec_order_radix(1L, direction = "x"), "must contain only")
   expect_error(vec_order_radix(1L, direction = c("asc", "asc")), "single value")
-  expect_error(vec_order_radix(1L, direction = NA_character_), "can't be missing")
-  expect_error(vec_order_radix(data.frame(x = 1), direction = c("asc", "asc")), "length 1 or")
+  expect_error(
+    vec_order_radix(1L, direction = NA_character_),
+    "can't be missing"
+  )
+  expect_error(
+    vec_order_radix(data.frame(x = 1), direction = c("asc", "asc")),
+    "length 1 or"
+  )
 })
 
 test_that("`x` is checked", {
@@ -1082,7 +1617,10 @@ test_that("ordering works with rcrd types", {
 test_that("data frame comparison proxies don't allow vector `direction` or `na_value`", {
   x <- tuple(c(1, 2, 1), c(3, 2, 1))
   expect_error(vec_order_radix(x, direction = c("desc", "asc")), "single value")
-  expect_error(vec_order_radix(x, na_value = c("largest", "smallest")), "single value")
+  expect_error(
+    vec_order_radix(x, na_value = c("largest", "smallest")),
+    "single value"
+  )
 })
 
 test_that("ordering works with df-cols", {
@@ -1093,9 +1631,15 @@ test_that("ordering works with df-cols", {
 
   # Can only supply a max of 2 `direction` or `na_value` values which get internally
   # expanded to 3 to match the flattened df proxy
-  expect_identical(vec_order_radix(df, direction = c("asc", "desc")), c(1L, 3L, 2L))
+  expect_identical(
+    vec_order_radix(df, direction = c("asc", "desc")),
+    c(1L, 3L, 2L)
+  )
 
-  expect_error(vec_order_radix(df, direction = c("desc", "desc", "asc")), "or length equal to")
+  expect_error(
+    vec_order_radix(df, direction = c("desc", "desc", "asc")),
+    "or length equal to"
+  )
 })
 
 test_that("ordering works with df-cols with 0 cols", {
@@ -1105,9 +1649,15 @@ test_that("ordering works with df-cols with 0 cols", {
   expect_identical(vec_order_radix(df), c(3L, 1L, 2L))
 
   # Can supply 3 `direction` values even though the 0-col df-col gets dropped
-  expect_identical(vec_order_radix(df, direction = c("asc", "desc", "desc")), c(1L, 3L, 2L))
+  expect_identical(
+    vec_order_radix(df, direction = c("asc", "desc", "desc")),
+    c(1L, 3L, 2L)
+  )
 
-  expect_error(vec_order_radix(df, direction = c("desc", "asc")), "or length equal to")
+  expect_error(
+    vec_order_radix(df, direction = c("desc", "asc")),
+    "or length equal to"
+  )
 })
 
 test_that("ordering works with rcrd cols", {
@@ -1118,20 +1668,38 @@ test_that("ordering works with rcrd cols", {
 
   # Can only supply a max of 2 `direction` values which get internally
   # expanded to 3 to match the flattened df proxy
-  expect_identical(vec_order_radix(df, direction = c("asc", "desc")), c(2L, 1L, 3L))
+  expect_identical(
+    vec_order_radix(df, direction = c("asc", "desc")),
+    c(2L, 1L, 3L)
+  )
 
-  expect_error(vec_order_radix(df, direction = c("desc", "desc", "asc")), "or length equal to")
+  expect_error(
+    vec_order_radix(df, direction = c("desc", "desc", "asc")),
+    "or length equal to"
+  )
 })
 
 # ------------------------------------------------------------------------------
 # `vec_order_radix()` - Pre-existing tests
 
 test_that("can request NAs sorted first", {
-  expect_equal(vec_order_radix(c(1, NA), direction = "asc", na_value = "largest"), 1:2)
-  expect_equal(vec_order_radix(c(1, NA), direction = "desc", na_value = "largest"), 2:1)
+  expect_equal(
+    vec_order_radix(c(1, NA), direction = "asc", na_value = "largest"),
+    1:2
+  )
+  expect_equal(
+    vec_order_radix(c(1, NA), direction = "desc", na_value = "largest"),
+    2:1
+  )
 
-  expect_equal(vec_order_radix(c(1, NA), direction = "asc", na_value = "smallest"), 2:1)
-  expect_equal(vec_order_radix(c(1, NA), direction = "desc", na_value = "smallest"), 1:2)
+  expect_equal(
+    vec_order_radix(c(1, NA), direction = "asc", na_value = "smallest"),
+    2:1
+  )
+  expect_equal(
+    vec_order_radix(c(1, NA), direction = "desc", na_value = "smallest"),
+    1:2
+  )
 })
 
 test_that("can sort data frames", {
@@ -1214,53 +1782,14 @@ test_that("`chr_proxy_collate` can result in keys being seen as identical", {
   x_expect <- data_frame(key = c("A", "b"), loc = list(c(2L, 3L), 1L))
   y_expect <- data_frame(key = c("a", "b"), loc = list(c(2L, 3L), 1L))
 
-  expect_identical(vec_locate_sorted_groups(x, chr_proxy_collate = tolower), x_expect)
-  expect_identical(vec_locate_sorted_groups(y, chr_proxy_collate = tolower), y_expect)
-})
-
-# ------------------------------------------------------------------------------
-# `vec_order_info(chr_ordered = FALSE)`
-
-test_that("can order character vectors in appearance order", {
-  x <- c("b", "a", "B", "B", "a")
-  info <- vec_order_info(x, chr_ordered = FALSE)
-
-  expect_identical(info[[1]], c(1L, 2L, 5L, 3L, 4L))
-  expect_identical(info[[2]], c(1L, 2L, 2L))
-  expect_identical(info[[3]], 2L)
-})
-
-test_that("using appearance order means `direction` has no effect", {
-  x <- c("b", "a", "B", "B", "a")
-
-  info1 <- vec_order_info(x, direction = "asc", chr_ordered = FALSE)
-  info2 <- vec_order_info(x, direction = "desc", chr_ordered = FALSE)
-
-  expect_identical(info1[[1]], info2[[1]])
-  expect_identical(info1[[2]], info2[[2]])
-  expect_identical(info1[[3]], info2[[3]])
-})
-
-test_that("appearance order works with NA - `na_value` has no effect", {
-  x <- c(NA, "foo", NA, "bar")
-  info <- vec_order_info(x, chr_ordered = FALSE)
-
-  expect_identical(info[[1]], c(1L, 3L, 2L, 4L))
-  expect_identical(info[[2]], c(2L, 1L, 1L))
-  expect_identical(info[[3]], 2L)
-})
-
-test_that("appearance order can be mixed with regular ordering", {
-  x <- c("b", "a", "B", "B", "a", "a")
-  y <- c(1, 2, 3, 4, 1, 2)
-  df <- data_frame(x = x, y = y)
-
-  # `y` breaks ties
-  info <- vec_order_info(df, chr_ordered = FALSE)
-
-  expect_identical(info[[1]], c(1L, 5L, 2L, 6L, 3L, 4L))
-  expect_identical(info[[2]], c(1L, 1L, 2L, 1L, 1L))
-  expect_identical(info[[3]], 2L)
+  expect_identical(
+    vec_locate_sorted_groups(x, chr_proxy_collate = tolower),
+    x_expect
+  )
+  expect_identical(
+    vec_locate_sorted_groups(y, chr_proxy_collate = tolower),
+    y_expect
+  )
 })
 
 # ------------------------------------------------------------------------------
@@ -1284,8 +1813,8 @@ test_that("Zero column data frames with >0 rows work (#1863)", {
   info <- vec_order_info(x)
 
   expect_identical(info[[1]], 1:5) # Order
-  expect_identical(info[[2]], 5L)  # Group sizes
-  expect_identical(info[[3]], 5L)  # Max group size
+  expect_identical(info[[2]], 5L) # Group sizes
+  expect_identical(info[[3]], 5L) # Max group size
 })
 
 test_that("Zero column data frames with exactly 0 rows work (#1863)", {
@@ -1323,20 +1852,44 @@ test_that("can sort empty data frames (#356)", {
 # vec_order
 
 test_that("can request NAs sorted first", {
-  expect_equal(vec_order(c(1, NA), direction = "asc", na_value = "largest"), 1:2)
-  expect_equal(vec_order(c(1, NA), direction = "desc", na_value = "largest"), 2:1)
+  expect_equal(
+    vec_order(c(1, NA), direction = "asc", na_value = "largest"),
+    1:2
+  )
+  expect_equal(
+    vec_order(c(1, NA), direction = "desc", na_value = "largest"),
+    2:1
+  )
 
-  expect_equal(vec_order(c(1, NA), direction = "asc", na_value = "smallest"), 2:1)
-  expect_equal(vec_order(c(1, NA), direction = "desc", na_value = "smallest"), 1:2)
+  expect_equal(
+    vec_order(c(1, NA), direction = "asc", na_value = "smallest"),
+    2:1
+  )
+  expect_equal(
+    vec_order(c(1, NA), direction = "desc", na_value = "smallest"),
+    1:2
+  )
 })
 
 test_that("can order complex vectors", {
   x <- complex(real = c(1, 2, 2, 3, 3), imaginary = c(5, 4, 3, 2, NA))
 
-  expect_equal(vec_order(x, direction = "asc", na_value = "largest"), c(1, 3, 2, 4, 5))
-  expect_equal(vec_order(x, direction = "desc", na_value = "largest"), rev(c(1, 3, 2, 4, 5)))
-  expect_equal(vec_order(x, direction = "asc", na_value = "smallest"), c(5, 1, 3, 2, 4))
-  expect_equal(vec_order(x, direction = "desc", na_value = "smallest"), rev(c(5, 1, 3, 2, 4)))
+  expect_equal(
+    vec_order(x, direction = "asc", na_value = "largest"),
+    c(1, 3, 2, 4, 5)
+  )
+  expect_equal(
+    vec_order(x, direction = "desc", na_value = "largest"),
+    rev(c(1, 3, 2, 4, 5))
+  )
+  expect_equal(
+    vec_order(x, direction = "asc", na_value = "smallest"),
+    c(5, 1, 3, 2, 4)
+  )
+  expect_equal(
+    vec_order(x, direction = "desc", na_value = "smallest"),
+    rev(c(5, 1, 3, 2, 4))
+  )
 })
 
 test_that("can order tibbles that contain non-comparable objects", {

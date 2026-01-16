@@ -323,7 +323,7 @@ r_obj* as_unique_names_impl(r_obj* names, bool quiet) {
     char buf[buf_size];
     buf[0] = '\0';
 
-    memcpy(buf, name, size);
+    r_memcpy(buf, name, size);
     int remaining = buf_size - size;
 
     int needed = snprintf(buf + size, remaining, "...%d", (int) i + 1);
@@ -548,14 +548,39 @@ r_obj* ffi_apply_name_spec(r_obj* name_spec, r_obj* outer, r_obj* inner, r_obj* 
   return apply_name_spec(name_spec, r_chr_get(outer, 0), inner, r_int_get(n, 0));
 }
 
+// Applies a `name_spec` and returns one of the following:
+// - `NULL`
+// - A character vector of length 1
+// - A character vector of length `n`
+//
+// In the case of:
+//
+// ```r
+// list_combine(
+//   list(outer = c(a = 1)),
+//   list(1:2),
+//   name_spec = "{outer}_{inner}"
+// )
+// ```
+//
+// The `n` will be 2 but `inner` will only be length 1, "a". We apply `name_spec`
+// to get `"outer_a"` and return that, expecting that the caller recycles that
+// explicitly if required, or uses something like `chr_assign()` which can
+// efficiently recycle internally.
 r_obj* apply_name_spec(r_obj* name_spec, r_obj* outer, r_obj* inner, r_ssize n) {
   if (r_inherits(name_spec, "rlang_zap")) {
     return r_null;
   }
 
-  if (outer == r_null) {
+  if (name_spec_is_inner(name_spec)) {
+    // Ignore `outer` entirely
     return inner;
   }
+  if (outer == r_null) {
+    // `outer` doesn't exist, no need to apply `name_spec`
+    return inner;
+  }
+
   if (r_typeof(outer) != R_TYPE_string) {
     r_stop_internal("`outer` must be a scalar string.");
   }
@@ -608,15 +633,12 @@ r_obj* apply_name_spec(r_obj* name_spec, r_obj* outer, r_obj* inner, r_ssize n) 
   r_obj* out = KEEP(vctrs_dispatch2(syms_dot_name_spec, name_spec,
                                     syms_outer, outer_chr,
                                     syms_inner, inner));
-  out = vec_recycle(out, n);
 
   if (out != r_null) {
     if (r_typeof(out) != R_TYPE_character) {
       r_abort("`.name_spec` must return a character vector.");
     }
-    if (r_length(out) != n) {
-      r_abort("`.name_spec` must return a character vector as long as `inner`.");
-    }
+    vec_check_recyclable(out, n, VCTRS_ALLOW_NULL_no, vec_args.empty, r_lazy_null);
   }
 
   FREE(4);
@@ -631,6 +653,16 @@ r_obj* glue_as_name_spec(r_obj* spec) {
   }
   return vctrs_dispatch1(syms_glue_as_name_spec, fns_glue_as_name_spec,
                          syms_internal_spec, spec);
+}
+
+bool name_spec_is_inner(r_obj* name_spec) {
+  if (!r_is_string(name_spec)) {
+    return false;
+  }
+
+  const char* name_spec_c_string = r_chr_get_c_string(name_spec, 0);
+
+  return !strcmp(name_spec_c_string, "inner");
 }
 
 #define VCTRS_PASTE_BUFFER_MAX_SIZE 4096
@@ -660,7 +692,7 @@ r_obj* r_chr_paste_prefix(r_obj* names, const char* prefix, const char* sep) {
   buf[total_len - 1] = '\0';
   char* bufp = buf;
 
-  memcpy(bufp, prefix, outer_len); bufp += outer_len;
+  r_memcpy(bufp, prefix, outer_len); bufp += outer_len;
 
   for (int i = 0; i < sep_len; ++i) {
     *bufp++ = sep[i];
@@ -672,7 +704,7 @@ r_obj* r_chr_paste_prefix(r_obj* names, const char* prefix, const char* sep) {
     const char* inner = r_str_c_string(p_names[i]);
     int inner_n = strlen(inner);
 
-    memcpy(bufp, inner, inner_n);
+    r_memcpy(bufp, inner, inner_n);
     bufp[inner_n] = '\0';
 
     r_chr_poke(names, i, r_str(buf));
@@ -737,7 +769,7 @@ void check_names(r_obj* x, r_obj* names) {
   }
 }
 
-r_obj* vec_set_rownames(r_obj* x, r_obj* names, bool proxy, const enum vctrs_owned owned) {
+r_obj* vec_set_rownames(r_obj* x, r_obj* names, bool proxy, const enum vctrs_ownership ownership) {
   if (!proxy && r_is_object(x)) {
     return set_rownames_dispatch(x, names);
   }
@@ -753,7 +785,7 @@ r_obj* vec_set_rownames(r_obj* x, r_obj* names, bool proxy, const enum vctrs_own
     }
   }
 
-  x = KEEP_N(vec_clone_referenced(x, owned), &nprot);
+  x = KEEP_N(vec_clone_referenced(x, ownership), &nprot);
 
   if (dim_names == r_null) {
     dim_names = KEEP_N(r_alloc_list(vec_dim_n(x)), &nprot);
@@ -770,13 +802,13 @@ r_obj* vec_set_rownames(r_obj* x, r_obj* names, bool proxy, const enum vctrs_own
   return x;
 }
 
-r_obj* vec_set_df_rownames(r_obj* x, r_obj* names, bool proxy, const enum vctrs_owned owned) {
+r_obj* vec_set_df_rownames(r_obj* x, r_obj* names, bool proxy, const enum vctrs_ownership ownership) {
   if (names == r_null) {
     if (rownames_type(df_rownames(x)) != ROWNAMES_TYPE_identifiers) {
       return(x);
     }
 
-    x = KEEP(vec_clone_referenced(x, owned));
+    x = KEEP(vec_clone_referenced(x, ownership));
     init_compact_rownames(x, vec_size(x));
 
     FREE(1);
@@ -789,7 +821,7 @@ r_obj* vec_set_df_rownames(r_obj* x, r_obj* names, bool proxy, const enum vctrs_
   }
   KEEP(names);
 
-  x = KEEP(vec_clone_referenced(x, owned));
+  x = KEEP(vec_clone_referenced(x, ownership));
   r_attrib_poke(x, r_syms.row_names, names);
 
   FREE(2);
@@ -798,15 +830,15 @@ r_obj* vec_set_df_rownames(r_obj* x, r_obj* names, bool proxy, const enum vctrs_
 
 // FIXME: Do we need to get the vec_proxy() and only fall back if it doesn't
 // exist? See #526 and #531 for discussion and the related issue.
-r_obj* vec_set_names_impl(r_obj* x, r_obj* names, bool proxy, const enum vctrs_owned owned) {
+r_obj* vec_set_names_impl(r_obj* x, r_obj* names, bool proxy, const enum vctrs_ownership ownership) {
   check_names(x, names);
 
   if (is_data_frame(x)) {
-    return vec_set_df_rownames(x, names, proxy, owned);
+    return vec_set_df_rownames(x, names, proxy, ownership);
   }
 
   if (has_dim(x)) {
-    return vec_set_rownames(x, names, proxy, owned);
+    return vec_set_rownames(x, names, proxy, ownership);
   }
 
   if (!proxy && r_is_object(x)) {
@@ -818,25 +850,37 @@ r_obj* vec_set_names_impl(r_obj* x, r_obj* names, bool proxy, const enum vctrs_o
     return x;
   }
 
-  if (owned) {
-    // Possibly skip the cloning altogether
-    x = KEEP(vec_clone_referenced(x, owned));
-    r_attrib_poke(x, r_syms.names, names);
-  } else {
-    // We need to clone, but to do this we will use `names<-`
+  switch (ownership) {
+  case VCTRS_OWNERSHIP_foreign: {
+    // We likely need to clone, but to do this we will use `names<-`
     // which can perform a cheaper ALTREP shallow duplication
     x = KEEP(set_names_dispatch(x, names));
+    break;
+  }
+  case VCTRS_OWNERSHIP_shallow:
+  case VCTRS_OWNERSHIP_deep: {
+    // This ends up skipping the cloning altogether
+    x = KEEP(vec_clone_referenced(x, ownership));
+    r_attrib_poke(x, r_syms.names, names);
+    break;
+  }
+  default: r_stop_unreachable();
   }
 
   FREE(1);
   return x;
 }
-// [[ register() ]]
-r_obj* vec_set_names(r_obj* x, r_obj* names) {
-  return vec_set_names_impl(x, names, false, VCTRS_OWNED_false);
+
+r_obj* vec_set_names(r_obj* x, r_obj* names, const enum vctrs_ownership ownership) {
+  return vec_set_names_impl(x, names, false, ownership);
 }
-r_obj* vec_proxy_set_names(r_obj* x, r_obj* names, const enum vctrs_owned owned) {
-  return vec_set_names_impl(x, names, true, owned);
+r_obj* vec_proxy_set_names(r_obj* x, r_obj* names, const enum vctrs_ownership ownership) {
+  return vec_set_names_impl(x, names, true, ownership);
+}
+
+r_obj* ffi_vec_set_names(r_obj* x, r_obj* names) {
+  // Comes from the R side, so `VCTRS_OWNERSHIP_foreign`
+  return vec_set_names(x, names, VCTRS_OWNERSHIP_foreign);
 }
 
 
@@ -977,6 +1021,7 @@ r_obj* vctrs_validate_minimal_names(r_obj* names, r_obj* n_) {
   return names;
 }
 
+r_obj* name_spec_inner = NULL;
 
 struct name_repair_opts unique_repair_default_opts;
 struct name_repair_opts unique_repair_silent_opts;
@@ -996,6 +1041,9 @@ void vctrs_init_names(r_obj* ns) {
   syms_glue_as_name_spec = r_sym("glue_as_name_spec");
   fns_glue_as_name_spec = r_env_get(ns, syms_glue_as_name_spec);
   syms_internal_spec = r_sym("_spec");
+
+  name_spec_inner = r_chr("inner");
+  r_preserve(name_spec_inner);
 
   unique_repair_default_opts.type = NAME_REPAIR_unique;
   unique_repair_default_opts.fn = r_null;

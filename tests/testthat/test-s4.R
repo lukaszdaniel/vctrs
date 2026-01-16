@@ -1,4 +1,3 @@
-
 test_that("basics", {
   x <- rando(10)
 
@@ -34,8 +33,14 @@ test_that("vec_ptype2 for rando works", {
   expect_error(vec_ptype2(x, ""), class = "vctrs_error_incompatible_type")
   expect_error(vec_ptype2("", x), class = "vctrs_error_incompatible_type")
 
-  expect_error(vec_ptype2(data.frame(), x), class = "vctrs_error_incompatible_type")
-  expect_error(vec_ptype2(x, data.frame()), class = "vctrs_error_incompatible_type")
+  expect_error(
+    vec_ptype2(data.frame(), x),
+    class = "vctrs_error_incompatible_type"
+  )
+  expect_error(
+    vec_ptype2(x, data.frame()),
+    class = "vctrs_error_incompatible_type"
+  )
 })
 
 test_that("vec_ptype_abbr.rando", {
@@ -55,16 +60,16 @@ test_that("proxy and data", {
   expect_true(isS4(vec_restore(vec_data(x), x)))
 })
 
-test_that("unset_s4() copies and works", {
+test_that("as_not_s4() copies and works", {
   # Initial condition
   x <- rando()
   expect_true(isS4(x))
 
   # Unsetting has no side effect on x
-  unset_s4(x)
+  as_not_s4(x)
   expect_true(isS4(x))
 
   # Unsetting actually works
-  y <- unset_s4(x)
+  y <- as_not_s4(x)
   expect_false(isS4(y))
 })

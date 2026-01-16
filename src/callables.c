@@ -3,12 +3,23 @@
 // -----------------------------------------------------------------------------
 // Maturing
 
-R_len_t short_vec_size(SEXP x) {
+bool maturing_obj_is_vector(SEXP x) {
+  return obj_is_vector(x, VCTRS_ALLOW_NULL_no);
+}
+
+R_len_t maturing_short_vec_size(SEXP x) {
   return vec_size(x);
 }
 
-SEXP short_vec_recycle(SEXP x, R_len_t size) {
-  return vec_recycle(x, size);
+SEXP maturing_short_vec_recycle(SEXP x, R_len_t size) {
+  return vec_recycle(x, size, vec_args.x, lazy_calls.vec_recycle);
+}
+
+// -----------------------------------------------------------------------------
+// Defunct
+
+bool defunct_vec_is_vector(SEXP x) {
+  Rf_errorcall(R_NilValue, "`vec_is_vector()` is defunct.");
 }
 
 // -----------------------------------------------------------------------------
@@ -31,7 +42,7 @@ SEXP exp_vec_names(SEXP x) {
 }
 
 SEXP exp_vec_set_names(SEXP x, SEXP names) {
-  return vec_set_names(x, names);
+  return vec_set_names(x, names, VCTRS_OWNERSHIP_foreign);
 }
 
 SEXP exp_short_compact_seq(R_len_t start, R_len_t size, bool increasing) {

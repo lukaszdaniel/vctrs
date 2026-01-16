@@ -1,8 +1,6 @@
 #' Locate observations matching specified conditions
 #'
 #' @description
-#' `r lifecycle::badge("experimental")`
-#'
 #' `vec_locate_matches()` is a more flexible version of [vec_match()] used to
 #' identify locations where each value of `needles` matches one or multiple
 #' values in `haystack`. Unlike `vec_match()`, `vec_locate_matches()` returns
@@ -299,21 +297,23 @@
 #'   value = vec_slice(values, matches$needle),
 #'   upper = vec_slice(upper, matches$haystack)
 #' )
-vec_locate_matches <- function(needles,
-                               haystack,
-                               ...,
-                               condition = "==",
-                               filter = "none",
-                               incomplete = "compare",
-                               no_match = NA_integer_,
-                               remaining = "drop",
-                               multiple = "all",
-                               relationship = "none",
-                               nan_distinct = FALSE,
-                               chr_proxy_collate = NULL,
-                               needles_arg = "needles",
-                               haystack_arg = "haystack",
-                               error_call = current_env()) {
+vec_locate_matches <- function(
+  needles,
+  haystack,
+  ...,
+  condition = "==",
+  filter = "none",
+  incomplete = "compare",
+  no_match = NA_integer_,
+  remaining = "drop",
+  multiple = "all",
+  relationship = "none",
+  nan_distinct = FALSE,
+  chr_proxy_collate = NULL,
+  needles_arg = "needles",
+  haystack_arg = "haystack",
+  error_call = current_env()
+) {
   check_dots_empty0(...)
   frame <- environment()
 
@@ -356,7 +356,12 @@ compute_nesting_container_info <- function(x, condition) {
 
 # ------------------------------------------------------------------------------
 
-stop_matches <- function(message = NULL, class = NULL, ..., call = caller_env()) {
+stop_matches <- function(
+  message = NULL,
+  class = NULL,
+  ...,
+  call = caller_env()
+) {
   stop_vctrs(
     message = message,
     class = c(class, "vctrs_error_matches"),
@@ -409,12 +414,16 @@ stop_matches_nothing <- function(i, needles_arg, haystack_arg, call) {
 
 #' @export
 cnd_header.vctrs_error_matches_nothing <- function(cnd, ...) {
-  glue::glue("Each value of `{cnd$needles_arg}` must have a match in `{cnd$haystack_arg}`.")
+  glue::glue(
+    "Each value of `{cnd$needles_arg}` must have a match in `{cnd$haystack_arg}`."
+  )
 }
 
 #' @export
 cnd_body.vctrs_error_matches_nothing <- function(cnd, ...) {
-  bullet <- glue::glue("Location {cnd$i} of `{cnd$needles_arg}` does not have a match.")
+  bullet <- glue::glue(
+    "Location {cnd$i} of `{cnd$needles_arg}` does not have a match."
+  )
   bullet <- c(x = bullet)
   format_error_bullets(bullet)
 }
@@ -433,12 +442,16 @@ stop_matches_remaining <- function(i, needles_arg, haystack_arg, call) {
 
 #' @export
 cnd_header.vctrs_error_matches_remaining <- function(cnd, ...) {
-  glue::glue("Each value of `{cnd$haystack_arg}` must be matched by `{cnd$needles_arg}`.")
+  glue::glue(
+    "Each value of `{cnd$haystack_arg}` must be matched by `{cnd$needles_arg}`."
+  )
 }
 
 #' @export
 cnd_body.vctrs_error_matches_remaining <- function(cnd, ...) {
-  bullet <- glue::glue("Location {cnd$i} of `{cnd$haystack_arg}` was not matched.")
+  bullet <- glue::glue(
+    "Location {cnd$i} of `{cnd$haystack_arg}` was not matched."
+  )
   bullet <- c(x = bullet)
   format_error_bullets(bullet)
 }
@@ -509,7 +522,13 @@ warn_matches_multiple <- function(i, needles_arg, haystack_arg, call) {
 
 # ------------------------------------------------------------------------------
 
-stop_matches_relationship_one_to_one <- function(i, which, needles_arg, haystack_arg, call) {
+stop_matches_relationship_one_to_one <- function(
+  i,
+  which,
+  needles_arg,
+  haystack_arg,
+  call
+) {
   stop_matches_relationship(
     class = "vctrs_error_matches_relationship_one_to_one",
     i = i,
@@ -539,7 +558,12 @@ cnd_body.vctrs_error_matches_relationship_one_to_one <- function(cnd, ...) {
 }
 
 
-stop_matches_relationship_one_to_many <- function(i, needles_arg, haystack_arg, call) {
+stop_matches_relationship_one_to_many <- function(
+  i,
+  needles_arg,
+  haystack_arg,
+  call
+) {
   stop_matches_relationship(
     class = "vctrs_error_matches_relationship_one_to_many",
     i = i,
@@ -560,7 +584,12 @@ cnd_body.vctrs_error_matches_relationship_one_to_many <- function(cnd, ...) {
 }
 
 
-stop_matches_relationship_many_to_one <- function(i, needles_arg, haystack_arg, call) {
+stop_matches_relationship_many_to_one <- function(
+  i,
+  needles_arg,
+  haystack_arg,
+  call
+) {
   stop_matches_relationship(
     class = "vctrs_error_matches_relationship_many_to_one",
     i = i,
@@ -590,7 +619,9 @@ stop_matches_relationship <- function(class = NULL, ..., call = caller_env()) {
 }
 
 cnd_matches_multiple_header <- function(x_arg, y_arg) {
-  glue::glue("Each value of `{x_arg}` can match at most 1 value from `{y_arg}`.")
+  glue::glue(
+    "Each value of `{x_arg}` can match at most 1 value from `{y_arg}`."
+  )
 }
 
 cnd_matches_multiple_body <- function(i, name) {
@@ -601,9 +632,17 @@ cnd_matches_multiple_body <- function(i, name) {
 
 # ------------------------------------------------------------------------------
 
-warn_matches_relationship_many_to_many <- function(i, j, needles_arg, haystack_arg, call) {
+warn_matches_relationship_many_to_many <- function(
+  i,
+  j,
+  needles_arg,
+  haystack_arg,
+  call
+) {
   message <- paste(
-    glue::glue("Detected an unexpected many-to-many relationship between `{needles_arg}` and `{haystack_arg}`."),
+    glue::glue(
+      "Detected an unexpected many-to-many relationship between `{needles_arg}` and `{haystack_arg}`."
+    ),
     cnd_matches_multiple_body(i, needles_arg),
     cnd_matches_multiple_body(j, haystack_arg),
     sep = "\n"
@@ -620,7 +659,12 @@ warn_matches_relationship_many_to_many <- function(i, j, needles_arg, haystack_a
   )
 }
 
-warn_matches_relationship <- function(message, class = NULL, ..., call = caller_env()) {
+warn_matches_relationship <- function(
+  message,
+  class = NULL,
+  ...,
+  call = caller_env()
+) {
   warn_matches(
     message = message,
     class = c(class, "vctrs_warning_matches_relationship"),

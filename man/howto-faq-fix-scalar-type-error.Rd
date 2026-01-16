@@ -2,6 +2,7 @@
 % Please edit documentation in R/faq-developer.R
 \name{howto-faq-fix-scalar-type-error}
 \alias{howto-faq-fix-scalar-type-error}
+\alias{howto_faq_fix_scalar_type_error}
 \title{FAQ - Why isn't my class treated as a vector?}
 \description{
 The tidyverse is a bit stricter than base R regarding what kind of
@@ -42,7 +43,8 @@ it possible for your class to dispatch on \code{list} methods of S3 generics:
 my_generic.list <- function(x) "dispatched!"
 
 my_generic(my_list)
-#> Error in UseMethod("my_generic"): no applicable method for 'my_generic' applied to an object of class "my_class"
+#> Error in `UseMethod()`:
+#> ! no applicable method for 'my_generic' applied to an object of class "my_class"
 
 my_generic(my_explicit_list)
 #> [1] "dispatched!"
@@ -64,14 +66,20 @@ class(my_df) <- c("data.frame", "my_class")
 
 vctrs::obj_check_vector(my_df)
 #> Error:
-#> ! `my_df` must be a vector, not a <data.frame/my_class> object.
+#> ! `my_df` must be a vector, not a <data.frame> object.
+#> x Detected incompatible data frame structure. A data frame is normally treated as a vector, but an incompatible class ordering was detected. To be compatible, the subclass <my_class> must come before <data.frame>, not after. Class: <data.frame/my_class>.
+#> i If this object comes from a package, please report this error to the package author.
+#> i Read our FAQ about creating vector types (`?vctrs::howto_faq_fix_scalar_type_error`) to learn more.
 }\if{html}{\out{</div>}}
 
 This is problematic as many tidyverse functions won’t work properly:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{dplyr::slice(my_df, 1)
 #> Error in `vec_slice()`:
-#> ! `x` must be a vector, not a <data.frame/my_class> object.
+#> ! `x` must be a vector, not a <data.frame> object.
+#> x Detected incompatible data frame structure. A data frame is normally treated as a vector, but an incompatible class ordering was detected. To be compatible, the subclass <my_class> must come before <data.frame>, not after. Class: <data.frame/my_class>.
+#> i If this object comes from a package, please report this error to the package author.
+#> i Read our FAQ about creating vector types (`?vctrs::howto_faq_fix_scalar_type_error`) to learn more.
 }\if{html}{\out{</div>}}
 
 It is generally not appropriate to declare your class to be a superclass

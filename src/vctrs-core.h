@@ -20,18 +20,70 @@ extern bool vctrs_debug_verbose;
 // condition object otherwise
 #define ERR SEXP
 
+// Generic swap macro
+#define SWAP(T, x, y) do { \
+  T tmp = x;               \
+  x = y;                   \
+  y = tmp;                 \
+} while (0)
 
-// Ownership is recursive
-enum vctrs_owned {
-  VCTRS_OWNED_false = 0,
-  VCTRS_OWNED_true
+struct r_ssize_int_pair {
+  r_ssize x;
+  int y;
 };
 
-enum vctrs_recurse {
-  VCTRS_RECURSE_false = 0,
-  VCTRS_RECURSE_true
+/**
+ * Ownership modeling
+ *
+ * Shallow and deep ownership imply that "we" own the object, and is not
+ * dependent on the refcount in any way.
+ *
+ * Foreign ownership implies that R owns the object, and can only be modified in
+ * place if the refcount is 0.
+ */
+enum vctrs_ownership {
+  // No known ownership
+  //
+  // The object is "foreign" to us, typically meaning it came through FFI
+  // (_foreign_ function interface) from the R side.
+  //
+  // If there are any references on this object, it will be cloned before being
+  // modified, otherwise it will still be modified in place without cloning.
+  VCTRS_OWNERSHIP_foreign,
+
+  // Shallow ownership
+  // - For atomics, we own the vector
+  // - For lists (data frames), we own the list, but not the contents (columns)
+  VCTRS_OWNERSHIP_shallow,
+
+  // Deep ownership
+  // We own the object recursively. Only used when we create it fully at C level.
+  VCTRS_OWNERSHIP_deep
 };
 
+/**
+ * Index style
+ *
+ * - Location indices can be integer, character, or logical, but are ultimately
+ *   converted to positive integer locations by `vec_as_location()` before the
+ *   core assignment loop.
+ *
+ * - Condition indices are logical vectors the same size as `x`, where `TRUE`
+ *   denotes that you should assign to that spot. They are not converted to
+ *   integer locations before assignment.
+ *
+ * `vec_assign()` has separate optimized paths for each index style.
+ *
+ * TODO: `vec_slice()` should also have an optimized path for condition indices!
+ * i.e. `vec_slice(x, <lgl>)` should not call `vec_as_location()`.
+ *
+ * Condition indices are the inputs to `dplyr::if_else()` and `dplyr::case_when()`,
+ * so having an optimized path for these is very helpful.
+ */
+enum vctrs_index_style {
+  VCTRS_INDEX_STYLE_location,
+  VCTRS_INDEX_STYLE_condition
+};
 
 /**
  * Structure for argument tags
@@ -52,12 +104,6 @@ struct vctrs_arg {
   r_ssize (*fill)(void* data, char* buf, r_ssize remaining);
   void* data;
 };
-
-struct vec_error_opts {
-  struct vctrs_arg* p_arg;
-  struct r_lazy call;
-};
-
 
 // Annex F of C99 specifies that `double` should conform to the IEEE 754
 // type `binary64`, which is defined as:
@@ -91,32 +137,38 @@ enum vctrs_dbl {
   VCTRS_DBL_nan
 };
 
-enum vctrs_dbl dbl_classify(double x);
+// Inlining `dbl_classify()` greatly improves `vec_match()` performance
+// with doubles!
+static inline
+enum vctrs_dbl dbl_classify(double x) {
+  if (!isnan(x)) {
+    return VCTRS_DBL_number;
+  }
+
+  union vctrs_dbl_indicator indicator;
+  indicator.value = x;
+
+  if (indicator.key[vctrs_indicator_pos] == 1954) {
+    return VCTRS_DBL_missing;
+  } else {
+    return VCTRS_DBL_nan;
+  }
+}
 
 
 // Compatibility ------------------------------------------------
 
-#if (R_VERSION < R_Version(3, 5, 0))
-# define LOGICAL_RO(x) ((const int*) LOGICAL(x))
-# define INTEGER_RO(x) ((const int*) INTEGER(x))
-# define REAL_RO(x) ((const double*) REAL(x))
-# define COMPLEX_RO(x) ((const Rcomplex*) COMPLEX(x))
-# define STRING_PTR_RO(x) ((const SEXP*) STRING_PTR(x))
-# define RAW_RO(x) ((const Rbyte*) RAW(x))
-# define DATAPTR_RO(x) ((const void*) STRING_PTR(x))
+#if (R_VERSION < R_Version(4, 5, 0))
+# define VECTOR_PTR_RO(x) ((const SEXP*) DATAPTR_RO(x))
 #endif
 
-#define VECTOR_PTR_RO(x) ((const SEXP*) DATAPTR_RO(x))
-
-// Likely supplied in R 4.4.0
 // https://github.com/wch/r-source/commit/38403c9c347dd5426da6009573b087188ec6be04
-#ifndef R_PRIdXLEN_T
+#if (R_VERSION < R_Version(4, 4, 0))
 # ifdef LONG_VECTOR_SUPPORT
 #  define R_PRIdXLEN_T "td"
 # else
 #  define R_PRIdXLEN_T "d"
 # endif
 #endif
-
 
 #endif

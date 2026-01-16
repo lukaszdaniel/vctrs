@@ -1,11 +1,5 @@
-
 test_that("vec_ptype() is a no-op for NULL", {
   expect_null(vec_ptype(NULL))
-})
-
-test_that("vec_ptype() is a no-op for partial types", {
-  expect_identical(vec_ptype(partial_factor("x")), partial_factor("x"))
-  expect_identical(vec_ptype(partial_frame(x = 1)), partial_frame(x = 1))
 })
 
 test_that("vec_ptype() errors on scalars", {
@@ -58,6 +52,12 @@ test_that("vec_ptype_common() handles matrices", {
   expect_identical(vec_ptype_common(m, m), matrix(int(), ncol = 2))
 })
 
+test_that("vec_ptype_common() doesn't mutate input", {
+  x <- list(a = 1L, b = 2)
+  expect_identical(vec_ptype_common(!!!x), numeric())
+  expect_identical(x, list(a = 1L, b = 2))
+})
+
 test_that("vec_ptype_common() includes index in argument tag", {
   df1 <- tibble(x = tibble(y = tibble(z = 1)))
   df2 <- tibble(x = tibble(y = tibble(z = "a")))
@@ -73,23 +73,44 @@ test_that("vec_ptype_common() includes index in argument tag", {
 
   # Names
   expect_snapshot(error = TRUE, vec_ptype_common(foo = TRUE, bar = "foo"))
-  expect_snapshot(error = TRUE, vec_ptype_common(foo = TRUE, baz = FALSE, bar = "foo"))
+  expect_snapshot(
+    error = TRUE,
+    vec_ptype_common(foo = TRUE, baz = FALSE, bar = "foo")
+  )
   expect_snapshot(error = TRUE, vec_ptype_common(foo = df1, bar = df2))
   expect_snapshot(error = TRUE, vec_ptype_common(df1, df1, bar = df2))
 
   # One splice box
   expect_snapshot(error = TRUE, vec_ptype_common(TRUE, !!!list(1, "foo")))
   expect_snapshot(error = TRUE, vec_ptype_common(TRUE, !!!list(1, 2), "foo"))
-  expect_snapshot(error = TRUE, vec_ptype_common(1, !!!list(TRUE, FALSE), "foo"))
+  expect_snapshot(
+    error = TRUE,
+    vec_ptype_common(1, !!!list(TRUE, FALSE), "foo")
+  )
 
   # One named splice box
-  expect_snapshot(error = TRUE, vec_ptype_common(foo = TRUE, !!!list(FALSE, FALSE), bar = "foo"))
-  expect_snapshot(error = TRUE, vec_ptype_common(foo = TRUE, !!!list(bar = 1, "foo")))
-  expect_snapshot(error = TRUE, vec_ptype_common(foo = TRUE, !!!list(bar = "foo")))
-  expect_snapshot(error = TRUE, vec_ptype_common(foo = TRUE, !!!list(bar = FALSE), baz = "chr"))
+  expect_snapshot(
+    error = TRUE,
+    vec_ptype_common(foo = TRUE, !!!list(FALSE, FALSE), bar = "foo")
+  )
+  expect_snapshot(
+    error = TRUE,
+    vec_ptype_common(foo = TRUE, !!!list(bar = 1, "foo"))
+  )
+  expect_snapshot(
+    error = TRUE,
+    vec_ptype_common(foo = TRUE, !!!list(bar = "foo"))
+  )
+  expect_snapshot(
+    error = TRUE,
+    vec_ptype_common(foo = TRUE, !!!list(bar = FALSE), baz = "chr")
+  )
 
   # Two splice boxes in next and current
-  expect_snapshot(error = TRUE, vec_ptype_common(foo = TRUE, !!!list(bar = FALSE), !!!list(baz = "chr")))
+  expect_snapshot(
+    error = TRUE,
+    vec_ptype_common(foo = TRUE, !!!list(bar = FALSE), !!!list(baz = "chr"))
+  )
 })
 
 test_that("proxied types are have s3 bare type", {
@@ -107,27 +128,31 @@ test_that("vec_ptype() errors on scalar lists", {
 })
 
 test_that("can retrieve type info", {
-  exp <- list(type = "integer", proxy_method = NULL)
+  exp <- list(type = "integer", had_proxy_method = FALSE)
   expect_identical(vec_type_info(1:3), exp)
 
-  exp <- list(type = "s3", proxy_method = NULL)
+  exp <- list(type = "s3", had_proxy_method = FALSE)
   expect_identical(vec_type_info(~foo), exp)
 
   x <- as.POSIXlt(new_datetime(0))
-  exp <- list(type = "s3", proxy_method = vec_proxy.POSIXlt)
+  exp <- list(type = "s3", had_proxy_method = TRUE)
   expect_identical(vec_type_info(x), exp)
 })
 
 test_that("can retrieve proxy info", {
-  exp <- list(type = "integer", proxy_method = NULL, proxy = 1:3)
+  exp <- list(type = "integer", had_proxy_method = FALSE, proxy = 1:3)
   expect_identical(vec_proxy_info(1:3), exp)
 
-  exp <- list(type = "scalar", proxy_method = NULL, proxy = ~foo)
+  exp <- list(type = "scalar", had_proxy_method = FALSE, proxy = ~foo)
   expect_identical(vec_proxy_info(~foo), exp)
 
   x <- as.POSIXlt(new_datetime(0))
   proxy <- new_data_frame(unclass(x))
-  exp <- list(type = "dataframe", proxy_method = vec_proxy.POSIXlt, proxy = proxy)
+  exp <- list(
+    type = "dataframe",
+    had_proxy_method = TRUE,
+    proxy = proxy
+  )
   expect_identical(vec_proxy_info(x), exp)
 })
 
@@ -135,8 +160,14 @@ test_that("class_type() detects classes", {
   expect_identical(class_type(list()), "none")
   expect_identical(class_type(foobar(list())), "unknown")
   expect_identical(class_type(structure(list(), class = "list")), "list")
-  expect_identical(class_type(subclass(structure(list(), class = "list"))), "list")
-  expect_identical(class_type(I(subclass(structure(list(), class = "list")))), "list")
+  expect_identical(
+    class_type(subclass(structure(list(), class = "list"))),
+    "list"
+  )
+  expect_identical(
+    class_type(I(subclass(structure(list(), class = "list")))),
+    "list"
+  )
 
   expect_identical(class_type(I(list())), "bare_asis")
   expect_identical(class_type(I(1)), "bare_asis")
@@ -149,7 +180,6 @@ test_that("class_type() detects classes", {
   expect_identical(class_type(new_ordered()), "bare_ordered")
   expect_identical(class_type(subclass(new_factor())), "unknown")
   expect_identical(class_type(subclass(new_ordered())), "unknown")
-
 
   expect_identical(class_type(new_date()), "bare_date")
   expect_identical(class_type(new_datetime()), "bare_posixct")
@@ -204,16 +234,22 @@ test_that("vec_ptype_finalise() works with NULL", {
 })
 
 test_that("vec_ptype_finalise() works recursively over bare data frames", {
-  df <- new_data_frame(list(x = numeric(), y = unspecified(), z = partial_factor()))
-  expect <- data_frame(x = numeric(), y = logical(), z = factor())
+  df <- new_data_frame(list(
+    x = numeric(),
+    y = unspecified()
+  ))
+  expect <- data_frame(x = numeric(), y = logical())
 
   expect_identical(vec_ptype_finalise(df), expect)
 })
 
 test_that("vec_ptype_finalise() works recursively over classed data frames", {
-  df <- new_data_frame(list(x = numeric(), y = unspecified(), z = partial_factor()))
+  df <- new_data_frame(list(
+    x = numeric(),
+    y = unspecified()
+  ))
   df <- subclass(df)
-  expect <- subclass(data_frame(x = numeric(), y = logical(), z = factor()))
+  expect <- subclass(data_frame(x = numeric(), y = logical()))
 
   expect_identical(vec_ptype_finalise(df), expect)
 })
@@ -226,7 +262,10 @@ test_that("vec_ptype_finalise() can handle data frame columns", {
 })
 
 test_that("vec_ptype_finalise() requires vector types", {
-  expect_error(vec_ptype_finalise(quote(name)), class = "vctrs_error_scalar_type")
+  expect_error(
+    vec_ptype_finalise(quote(name)),
+    class = "vctrs_error_scalar_type"
+  )
   expect_error(vec_ptype_finalise(foobar()), class = "vctrs_error_scalar_type")
 })
 
@@ -263,5 +302,84 @@ test_that("vec_ptype_common() handles spliced names consistently (#1570)", {
       "{y_name}" := NULL,
       "{z_name}" := 1
     )
+  })
+})
+
+test_that("vec_ptype() and vec_ptype2() don't finalize their output", {
+  expect_identical(vec_ptype(NA), unspecified())
+  expect_identical(vec_ptype2(NA, NA), unspecified())
+  expect_identical(vec_ptype2(NA, NULL), unspecified())
+  expect_identical(vec_ptype2(NULL, NA), unspecified())
+
+  expect_identical(vec_ptype(unspecified()), unspecified())
+  expect_identical(vec_ptype2(unspecified(), unspecified()), unspecified())
+  expect_identical(vec_ptype2(unspecified(), NULL), unspecified())
+  expect_identical(vec_ptype2(NULL, unspecified()), unspecified())
+})
+
+test_that("vec_ptype_common() always finalizes its output (#2099)", {
+  expect_identical(vec_ptype_common(NA), logical())
+  expect_identical(vec_ptype_common(NA, NA), logical())
+  expect_identical(vec_ptype_common(unspecified(1)), logical())
+  expect_identical(vec_ptype_common(unspecified(1), unspecified(1)), logical())
+
+  # Even explicit `.ptype`s
+  expect_identical(
+    vec_ptype_common(.ptype = NA),
+    logical()
+  )
+  expect_identical(
+    vec_ptype_common(.ptype = unspecified(1)),
+    logical()
+  )
+})
+
+test_that("vec_ptype_common() lets you opt out of ptype finalization (#2094)", {
+  expect_identical(
+    vec_ptype_common(NA, .finalise = FALSE),
+    unspecified()
+  )
+  expect_identical(
+    vec_ptype_common(NA, NA, .finalise = FALSE),
+    unspecified()
+  )
+  expect_identical(
+    vec_ptype_common(unspecified(1), .finalise = FALSE),
+    unspecified()
+  )
+  expect_identical(
+    vec_ptype_common(unspecified(1), unspecified(1), .finalise = FALSE),
+    unspecified()
+  )
+
+  # Works for explicit `.ptype` too
+  expect_identical(
+    vec_ptype_common(.ptype = NA, .finalise = FALSE),
+    unspecified()
+  )
+  expect_identical(
+    vec_ptype_common(.ptype = unspecified(1), .finalise = FALSE),
+    unspecified()
+  )
+})
+
+test_that("vec_ptype_common_params() lets you opt out of ptype finalization", {
+  expect_identical(
+    vec_ptype_common_params(NA, .finalise = FALSE),
+    unspecified()
+  )
+  # Works for explicit `.ptype` too
+  expect_identical(
+    vec_ptype_common_params(.ptype = NA, .finalise = FALSE),
+    unspecified()
+  )
+})
+
+test_that("`.finalise` is validated", {
+  expect_snapshot(error = TRUE, {
+    vec_ptype_common(.finalise = 1)
+  })
+  expect_snapshot(error = TRUE, {
+    vec_ptype_common_params(.finalise = 1)
   })
 })

@@ -10,15 +10,15 @@ vec_slice(x, i, ..., error_call = current_env())
 
 vec_slice(x, i) <- value
 
-vec_assign(x, i, value, ..., x_arg = "", value_arg = "")
+vec_assign(x, i, value, ..., slice_value = FALSE, x_arg = "", value_arg = "")
 }
 \arguments{
 \item{x}{A vector}
 
-\item{i}{An integer, character or logical vector specifying the
-locations or names of the observations to get/set. Specify
-\code{TRUE} to index all elements (as in \code{x[]}), or \code{NULL}, \code{FALSE} or
-\code{integer()} to index none (as in \code{x[NULL]}).}
+\item{i}{An integer, character or logical vector specifying the locations or
+names of the observations to get/set. Specify \code{TRUE} to index all elements
+(as in \code{x[]}), or \code{NULL}, \code{FALSE} or \code{integer()} to index none (as in
+\code{x[NULL]}).}
 
 \item{...}{These dots are for future extensions and must be empty.}
 
@@ -27,9 +27,19 @@ running function, e.g. \code{caller_env()}. The function will be
 mentioned in error messages as the source of the error. See the
 \code{call} argument of \code{\link[rlang:abort]{abort()}} for more information.}
 
-\item{value}{Replacement values. \code{value} is cast to the type of
-\code{x}, but only if they have a common type. See below for examples
-of this rule.}
+\item{value}{A vector of replacement values
+
+\code{value} is cast to the type of \code{x}.
+
+If \code{slice_value = FALSE}, \code{value} must be size 1 or the same size as \code{i}
+after \code{i} has been converted to a positive integer location vector with
+\code{\link[=vec_as_location]{vec_as_location()}} (which may not be the same size as \code{i} originally).
+
+If \code{slice_value = TRUE}, \code{value} must be size 1 or the same size as \code{x}.}
+
+\item{slice_value}{A boolean. If \code{TRUE}, the assignment proceeds as if you
+had provided \code{vec_slice(x, i) <- vec_slice(value, i)}, but is optimized to
+avoid materializing the slice of \code{value}.}
 
 \item{x_arg, value_arg}{Argument names for \code{x} and \code{value}. These are used
 in error messages to inform the user about the locations of
@@ -41,8 +51,8 @@ A vector of the same type as \code{x}.
 }
 \description{
 This provides a common interface to extracting and modifying observations
-for all vector types, regardless of dimensionality. It is an analog to \code{[}
-that matches \code{\link[=vec_size]{vec_size()}} instead of \code{length()}.
+for all vector types, regardless of dimensionality. They are analogs to \code{[}
+and \verb{[<-} that match \code{\link[=vec_size]{vec_size()}} instead of \code{length()}.
 }
 \section{Genericity}{
 
@@ -50,10 +60,23 @@ that matches \code{\link[=vec_size]{vec_size()}} instead of \code{length()}.
 Support for S3 objects depends on whether the object implements a
 \code{\link[=vec_proxy]{vec_proxy()}} method.
 \itemize{
-\item When a \code{vec_proxy()} method exists, the proxy is sliced and
+\item When a \code{vec_proxy()} method exists, the proxy is sliced or assigned to and
 \code{vec_restore()} is called on the result.
-\item Otherwise \code{vec_slice()} falls back to the base generic \code{[}.
+\item Otherwise, \code{vec_slice()} falls back to the base generic \code{[} and
+\verb{vec_slice<-()} falls back to the base generic \verb{[<-}.
 }
+
+When \verb{vec_slice<-()} falls back to \verb{[<-}, it is expected that the subclass's
+\verb{[<-} method can handle the following subset of cases that base R's \verb{[<-}
+can also handle:
+\itemize{
+\item An \code{i} vector of positive integer positions (notably excluding \code{NA}).
+\item A \code{value} vector of length 1 or length \code{length(i)}. If length 1, it
+should be recycled by the \verb{[<-} method to the length of \code{i}.
+}
+
+If your \verb{[<-} method eventually calls base R's native \verb{[<-} code, then these
+cases will be handled for you.
 
 Note that S3 lists are treated as scalars by default, and will
 cause an error if they don't implement a \code{\link[=vec_proxy]{vec_proxy()}} method.
@@ -82,10 +105,8 @@ as the LHS.
 \subsection{base dependencies}{
 \itemize{
 \item \code{base::`[`}
+\item \code{base::`[<-`}
 }
-
-If a non-data-frame vector class doesn't have a \code{\link[=vec_proxy]{vec_proxy()}}
-method, the vector is sliced with \code{[} instead.
 }
 }
 
@@ -135,5 +156,30 @@ try(vec_cast(1.5, integer()))
 # vector:
 x <- 1:3
 try(vec_slice(x, 2) <- 1.5)
+
+# Slicing `value` -------------------------------------------------
+
+# Sometimes both `x` and `value` start from objects that are the same length,
+# and you need to slice `value` by `i` before assigning it to `x`. This comes
+# up when thinking about how `base::ifelse()` and `dplyr::case_when()` work.
+condition <- c(TRUE, FALSE, TRUE, FALSE)
+yes <- 1:4
+no <- 5:8
+
+# Create an output container and fill it
+out <- vec_init(integer(), 4)
+out <- vec_assign(out, condition, vec_slice(yes, condition))
+out <- vec_assign(out, !condition, vec_slice(no, !condition))
+out
+
+# This is wasteful because you have to materialize the slices of `yes` and
+# `no` before they can be assigned, and you also have to validate `condition`
+# multiple times. Using `slice_value` internally performs
+# `vec_slice(yes, condition)` and `vec_slice(no, !condition)` for you,
+# but does so in a way that avoids the materialization.
+out <- vec_init(integer(), 4)
+out <- vec_assign(out, condition, yes, slice_value = TRUE)
+out <- vec_assign(out, !condition, no, slice_value = TRUE)
+out
 }
 \keyword{internal}
