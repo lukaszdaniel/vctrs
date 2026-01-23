@@ -1,3 +1,7 @@
+# vctrs 0.7.1
+
+* Fixed some protection issues discovered by rchk.
+
 # vctrs 0.7.0
 
 ## Features

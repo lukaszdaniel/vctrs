@@ -1,8 +1,8 @@
-efda6ec334d4f6d6c953130636fd789e *DESCRIPTION
+093f15ca32b6f2c0be6a472a1529d8c2 *DESCRIPTION
 bb38d60fdc799f700b0f8537f9fc4110 *LICENSE
 26e8ea3522f7f470d41408ce931449af *LICENSE.note
 dc3f838ef66b256caca5df59b42deb4a *NAMESPACE
-d5cb434d0b21aabfa8a4a31b499f7beb *NEWS.md
+d7f6ce13ad8f9a6f03d103c3c948aeea *NEWS.md
 aa8a25ae369276c1dab0b1a900b9365e *R/aaa.R
 0bbbaba064d71671123f99018084f9de *R/altrep-lazy-character.R
 d48dd39d64c50737eef1ea7d09ad9260 *R/altrep-rle.R
@@ -99,7 +99,7 @@ ebbada9679b83b39ca4407d1d02628d2 *inst/doc/pillar.R
 49ff68ae5697dc2d24651e0fc442e931 *inst/doc/s3-vector.html
 cd3e6a61510015a8cad3dbc88a890846 *inst/doc/stability.R
 4839ddd2a359470622d6edcca6c49edf *inst/doc/stability.Rmd
-4e9d09ed5e7b4743b949651dca50b5a5 *inst/doc/stability.html
+1d0591ff78519b8153b36f28e8cb7b2d *inst/doc/stability.html
 97bea39da468c17c2c7b6fc50ab4798e *inst/doc/type-size.R
 317b475c17b8b2a70f68cca0402f9eb9 *inst/doc/type-size.Rmd
 2b207fc30d8af0f2e313543eb8ff45d6 *inst/doc/type-size.html
@@ -412,7 +412,7 @@ aadc788be09a2bd9a565c3e825eb428c *src/rlang/dyn-list-of.c
 8583e3401eae8da21c4f8b094ce700c0 *src/rlang/env-binding.c
 a3ffa65b75e405cc3862568b36eecd35 *src/rlang/env-binding.h
 178f5c61838ac9d98916403cd7837018 *src/rlang/env.c
-c25ad049e33fc967b89fef514fd9d10a *src/rlang/env.h
+6b5383d210ece2a2ba1e0279ca67952e *src/rlang/env.h
 a583e80002ca6e63b3475e1c5561b52d *src/rlang/eval.c
 4ca79fe26c1b1cfd826dbc1bd8db3709 *src/rlang/eval.h
 01f0a156858ea14578547720b4e94232 *src/rlang/export.c
@@ -481,10 +481,10 @@ cc6a305c27dbb57f0792ad44b18f7eba *src/subscript.c
 2d03929f47a994b9cc2036814a064f17 *src/translate.c
 62b98987efc807f7195535b735f21bb7 *src/translate.h
 2ed6cb1fe158181955e0d1173db382cf *src/type-complex.h
-4285b2f813788262e790c5c43f6adff3 *src/type-data-frame.c
+9acc5631baf86bff6e71dcc141bb3471 *src/type-data-frame.c
 c712748c200299a0345eb2cd369880ba *src/type-data-frame.h
 a6b73eb9808ebcf7417f0d174a66aa15 *src/type-date-time.c
-27e1169e212821ebe2480b3c785a9067 *src/type-factor.c
+1ef1df864df215ff8bf9c1145280ef07 *src/type-factor.c
 9a972301fb357d08fec198da4a71fa5c *src/type-factor.h
 870fa35aa2dcd1d1e9b33543596ec921 *src/type-info.c
 8c817d61d686f67b6e96c289e1d751a4 *src/type-info.h
@@ -505,7 +505,7 @@ fd0c439ab7710597af2d5e87541cf513 *src/utils.h
 f62ba58b1fc71780fc4240df15d5c451 *src/vctrs.h
 fa10273e066c29ff70e18a49cad0e508 *src/vec-bool.h
 e949168c2ec3c8f10f0efb88420955e3 *src/vec-int.h
-3b8a77463eb76b7d322ad7f7f6452751 *src/version.c
+3bf596c0d72f0a8c39bf950b02b0eae8 *src/version.c
 8ed8f6a8bd8f35f801d615323a1830a6 *tests/testthat.R
 10f848ae4fbfd2b016307e01cc0759c5 *tests/testthat/_snaps/assert.md
 ecf9ad92531426beb5f002d59ed538c0 *tests/testthat/_snaps/bind.md
