@@ -45,6 +45,8 @@ r_obj* vec_rank(r_obj* x,
                 r_obj* na_value,
                 bool nan_distinct,
                 r_obj* chr_proxy_collate) {
+  obj_check_vector(x, VCTRS_ALLOW_NULL_no, vec_args.x, r_lazy_null);
+
   r_ssize size = vec_size(x);
 
   r_keep_loc pi_x;
@@ -81,9 +83,7 @@ r_obj* vec_rank(r_obj* x,
   r_obj* rank = KEEP(r_alloc_integer(rank_size));
   int* v_rank = r_int_begin(rank);
 
-  const bool chr_ordered = true;
-
-  r_obj* info = KEEP(vec_order_info(x, direction, na_value, nan_distinct, chr_proxy_collate, chr_ordered));
+  r_obj* info = KEEP(vec_order_info(x, direction, na_value, nan_distinct, chr_proxy_collate));
 
   r_obj* order = r_list_get(info, 0);
   const int* v_order = r_int_cbegin(order);

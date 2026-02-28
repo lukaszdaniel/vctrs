@@ -3,7 +3,7 @@ local_name_repair_quiet()
 test_that("zero length input returns NULL", {
   expect_equal(vec_c(), NULL)
   expect_equal(vec_c(NULL), NULL)
-  expect_equal(vec_c(NULL,), NULL)
+  expect_equal(vec_c(NULL, ), NULL)
   expect_equal(vec_c(NULL, NULL), NULL)
 })
 
@@ -45,7 +45,12 @@ test_that("common type failure uses error call and error arg (#1641, #1692)", {
     vec_c("x", 1, .error_call = call("foo"), .error_arg = "arg")
   })
   expect_snapshot(error = TRUE, {
-    vec_c("x", .ptype = integer(), .error_call = call("foo"), .error_arg = "arg")
+    vec_c(
+      "x",
+      .ptype = integer(),
+      .error_call = call("foo"),
+      .error_arg = "arg"
+    )
   })
 })
 
@@ -109,17 +114,27 @@ test_that("vec_c() handles record classes", {
 
   expect_true(vec_is(out, rational(1, 2)))
   expect_size(out, 3)
-  expect_identical(vec_proxy(out), data.frame(n = c(1L, 1L, NA), d = c(2L, 1L, NA)))
+  expect_identical(
+    vec_proxy(out),
+    data.frame(n = c(1L, 1L, NA), d = c(2L, 1L, NA))
+  )
 })
 
 test_that("can mix named and unnamed vectors (#271)", {
   expect_identical(vec_c(c(a = 1), 2), c(a = 1, 2))
-  expect_identical(vec_c(0, c(a = 1), 2, b = 3), c(0, a = 1, 2, b =3))
+  expect_identical(vec_c(0, c(a = 1), 2, b = 3), c(0, a = 1, 2, b = 3))
 })
 
 test_that("preserves names when inputs are cast to a common type (#1690)", {
   expect_named(vec_c(c(a = 1), .ptype = integer()), "a")
-  expect_named(vec_c(foo = c(a = 1), .ptype = integer(), .name_spec = "{outer}_{inner}"), "foo_a")
+  expect_named(
+    vec_c(foo = c(a = 1), .ptype = integer(), .name_spec = "{outer}_{inner}"),
+    "foo_a"
+  )
+  expect_named(
+    vec_c(foo = c(a = 1), .ptype = integer(), .name_spec = "inner"),
+    "a"
+  )
 })
 
 test_that("vec_c() repairs names", {
@@ -130,10 +145,19 @@ test_that("vec_c() repairs names", {
   out <- vec_c(!!!set_names(1, NA))
   expect_named(out, "")
 
-  expect_named(vec_c(a = 1, a = 2, `_` = 3, .name_repair = "unique"), c("a...1", "a...2", "_"))
-  expect_error(vec_c(a = 1, a = 2, `_` = 3, .name_repair = "check_unique"), class = "vctrs_error_names_must_be_unique")
+  expect_named(
+    vec_c(a = 1, a = 2, `_` = 3, .name_repair = "unique"),
+    c("a...1", "a...2", "_")
+  )
+  expect_error(
+    vec_c(a = 1, a = 2, `_` = 3, .name_repair = "check_unique"),
+    class = "vctrs_error_names_must_be_unique"
+  )
 
-  expect_named(vec_c(a = 1, a = 2, `_` = 3, .name_repair = "universal"), c("a...1", "a...2", "._"))
+  expect_named(
+    vec_c(a = 1, a = 2, `_` = 3, .name_repair = "universal"),
+    c("a...1", "a...2", "._")
+  )
 
   expect_named(vec_c(a = 1, a = 2, .name_repair = ~ toupper(.)), c("A", "A"))
 })
@@ -141,12 +165,16 @@ test_that("vec_c() repairs names", {
 test_that("vec_c() can repair names quietly", {
   local_name_repair_verbose()
 
-   expect_snapshot({
-     res_unique <- vec_c(x = TRUE, x = 0, .name_repair = "unique_quiet")
-     res_universal <- vec_c("if" = TRUE, "in" = 0, .name_repair = "universal_quiet")
-   })
-   expect_named(res_unique, c("x...1", "x...2"))
-   expect_named(res_universal, c(".if", ".in"))
+  expect_snapshot({
+    res_unique <- vec_c(x = TRUE, x = 0, .name_repair = "unique_quiet")
+    res_universal <- vec_c(
+      "if" = TRUE,
+      "in" = 0,
+      .name_repair = "universal_quiet"
+    )
+  })
+  expect_named(res_unique, c("x...1", "x...2"))
+  expect_named(res_universal, c(".if", ".in"))
 })
 
 test_that("vec_c() doesn't use outer names for data frames (#524)", {
@@ -166,7 +194,10 @@ test_that("vec_c() preserves row names and inner names", {
 
   vec_x <- set_names(1:3, letters[1:3])
   vec_y <- c(FOO = 4L)
-  oo_x <- set_names(as.POSIXlt(c("2020-01-01", "2020-01-02", "2020-01-03")), letters[1:3])
+  oo_x <- set_names(
+    as.POSIXlt(c("2020-01-01", "2020-01-02", "2020-01-03")),
+    letters[1:3]
+  )
   oo_y <- as.POSIXlt(c(FOO = "2020-01-04"))
   df_x <- new_data_frame(list(x = 1:3), row.names = letters[1:3])
   df_y <- new_data_frame(list(x = 4L), row.names = "d")
@@ -221,7 +252,10 @@ test_that("vec_c() fails with complex foreign S3 classes", {
     x <- structure(foobar(1), attr_foo = "foo")
     y <- structure(foobar(2), attr_bar = "bar")
     (expect_error(vec_c(x, y), class = "vctrs_error_incompatible_type"))
-    (expect_error(vec_c(x, y, .error_call = call("foo"), .error_arg = "arg"), class = "vctrs_error_incompatible_type"))
+    (expect_error(
+      vec_c(x, y, .error_call = call("foo"), .error_arg = "arg"),
+      class = "vctrs_error_incompatible_type"
+    ))
   })
 })
 
@@ -230,7 +264,10 @@ test_that("vec_c() fails with complex foreign S4 classes", {
     joe <- .Counts(c(1L, 2L), name = "Joe")
     jane <- .Counts(3L, name = "Jane")
     (expect_error(vec_c(joe, jane), class = "vctrs_error_incompatible_type"))
-    (expect_error(vec_c(joe, jane, .error_call = call("foo"), .error_arg = "arg"), class = "vctrs_error_incompatible_type"))
+    (expect_error(
+      vec_c(joe, jane, .error_call = call("foo"), .error_arg = "arg"),
+      class = "vctrs_error_incompatible_type"
+    ))
   })
 })
 
@@ -284,7 +321,10 @@ test_that("c() fallback is consistent", {
       direct = vec_c(foobar(1L), foobar(2L)),
       df = vec_c(data_frame(x = foobar(1L)), data_frame(x = foobar(2L))),
       tib = vec_c(tibble(x = foobar(1L)), tibble(x = foobar(2L))),
-      foreign_df = vec_c(foobaz(data_frame(x = foobar(1L))), foobaz(data_frame(x = foobar(2L))))
+      foreign_df = vec_c(
+        foobaz(data_frame(x = foobar(1L))),
+        foobaz(data_frame(x = foobar(2L)))
+      )
     )
   )
   expect_equal(out$direct, dispatched(1:2))
@@ -339,10 +379,14 @@ test_that("vec_c() falls back to c() if S4 method is available", {
   )
 })
 
-test_that("vec_c() fallback doesn't support `name_spec` or `ptype`", {
+test_that("vec_c() fallback doesn't support (most) `name_spec` or `ptype`", {
   expect_snapshot({
     (expect_error(
-      with_c_foobar(vec_c(foobar(1), foobar(2), .name_spec = "{outer}_{inner}")),
+      with_c_foobar(vec_c(
+        foobar(1),
+        foobar(2),
+        .name_spec = "{outer}_{inner}"
+      )),
       "name specification"
     ))
 
@@ -355,12 +399,37 @@ test_that("vec_c() fallback doesn't support `name_spec` or `ptype`", {
     # Uses error call (#1641)
     (expect_error(
       with_c_foobar(vec_c(
-        foobar(1), foobar(2),
+        foobar(1),
+        foobar(2),
         .error_call = call("foo"),
         .name_spec = "{outer}_{inner}"
       ))
     ))
   })
+})
+
+test_that("vec_c() fallback does support `.name_spec = 'inner'`", {
+  # Because of how useful it is, and how easy it is to implement!
+  # It's extremely useful to be able to hardcode `.name_spec = "inner"`
+  # and not have to worry about hitting a fallback type that wouldn't support
+  # `name_spec`.
+  expect_identical(
+    with_c_foobar(vec_c(foobar(1), foobar(2), .name_spec = "inner")),
+    foobar_c(c(1, 2))
+  )
+  expect_identical(
+    with_c_foobar(vec_c(x = foobar(1), y = foobar(2), .name_spec = "inner")),
+    foobar_c(c(1, 2))
+  )
+  expect_identical(
+    with_c_foobar(vec_c(
+      x = foobar(c(a = 1)),
+      y = foobar(c(b = 2)),
+      z = foobar(3),
+      .name_spec = "inner"
+    )),
+    foobar_c(c(a = 1, b = 2, 3))
+  )
 })
 
 test_that("vec_c() doesn't fall back when ptype2 is implemented", {
@@ -385,7 +454,11 @@ test_that("vec_c() falls back even when ptype is supplied", {
     c.vctrs_foobar = function(...) quux(NextMethod()),
     {
       expect_quux(vec_c(foobar(1), foobar(2), .ptype = foobar(dbl())))
-      expect_quux(vec_c(foobar(1, foo = TRUE), foobar(2, bar = TRUE), .ptype = foobar(dbl())))
+      expect_quux(vec_c(
+        foobar(1, foo = TRUE),
+        foobar(2, bar = TRUE),
+        .ptype = foobar(dbl())
+      ))
     }
   )
 })
@@ -424,6 +497,18 @@ test_that("can ignore names in `vec_c()` by providing a `zap()` name-spec (#232)
       vec_c(a = c(b = letters), b = 1, .name_spec = zap()),
       class = "vctrs_error_incompatible_type"
     ))
+  })
+})
+
+test_that("can ignore outer names in `vec_c()` by providing an 'inner' name-spec (#1988)", {
+  expect_identical(
+    vec_c(x = c(a = 1, 2), y = c(3, b = 4), .name_spec = "inner"),
+    c(a = 1, 2, 3, b = 4)
+  )
+
+  # Importantly, outer names are still used in error messages!
+  expect_snapshot(error = TRUE, {
+    vec_c(x = c(a = 1), y = c(b = "2"), .name_spec = "inner")
   })
 })
 
@@ -469,11 +554,45 @@ test_that("can zap outer names from a name-spec (#1215)", {
   )
 
   expect_null(
-    names(list_unchop(list(a = 1:2), indices = list(1:2), name_spec = zap_outer_spec))
+    names(list_unchop(
+      list(a = 1:2),
+      indices = list(1:2),
+      name_spec = zap_outer_spec
+    ))
   )
   expect_identical(
-    names(list_unchop(list(a = 1:2, c(foo = 3L)), indices = list(1:2, 3), name_spec = zap_outer_spec)),
+    names(list_unchop(
+      list(a = 1:2, c(foo = 3L)),
+      indices = list(1:2, 3),
+      name_spec = zap_outer_spec
+    )),
     c("", "", "foo")
+  )
+
+  # These days it is more efficient to use a name-spec of "inner" (#1988)
+  expect_identical(
+    vec_c(a = 1:2, .name_spec = zap_outer_spec),
+    vec_c(a = 1:2, .name_spec = "inner")
+  )
+  expect_identical(
+    vec_c(a = 1:2, c(foo = 3L), .name_spec = zap_outer_spec),
+    vec_c(a = 1:2, c(foo = 3L), .name_spec = "inner")
+  )
+  expect_identical(
+    list_unchop(list(a = 1:2), indices = list(1:2), name_spec = zap_outer_spec),
+    list_unchop(list(a = 1:2), indices = list(1:2), name_spec = "inner")
+  )
+  expect_identical(
+    list_unchop(
+      list(a = 1:2, c(foo = 3L)),
+      indices = list(1:2, 3),
+      name_spec = zap_outer_spec
+    ),
+    list_unchop(
+      list(a = 1:2, c(foo = 3L)),
+      indices = list(1:2, 3),
+      name_spec = "inner"
+    )
   )
 })
 
@@ -490,6 +609,35 @@ test_that("named empty vectors force named output (#1263)", {
   expect_named(list_unchop(list(x, 1L), indices = list(int(), 1)), "")
 
   expect_named(list_unchop(list(x, 1), indices = list(int(), 1)), "")
+})
+
+test_that("calls cast method even with empty objects", {
+  # https://github.com/paleolimbot/wk/issues/230
+
+  # There is a common type, but the cast method is intended
+  # to fail here for this test
+  local_methods(
+    vec_ptype2.vctrs_foobar.vctrs_foobar = function(x, y, ...) {
+      x
+    },
+    vec_cast.vctrs_foobar.default = function(x, to, ...) {
+      vec_default_cast(x, to)
+    }
+  )
+
+  expect_snapshot(error = TRUE, {
+    vec_c(
+      foobar(integer()),
+      foobar(integer(), foo = "bar")
+    )
+  })
+})
+
+test_that("can handle spliced lists (#1578)", {
+  expect_identical(
+    vec_c(!!!list(foo = 1), !!!list(bar = 2)),
+    c(foo = 1, bar = 2)
+  )
 })
 
 # Golden tests -------------------------------------------------------
@@ -517,7 +665,6 @@ test_that("concatenation performs expected allocations", {
     "Doubles to integer"
     with_memory_prof(vec_c_list(dbls, ptype = int()))
 
-
     "# `list_unchop()` "
     "Integers"
     with_memory_prof(list_unchop(ints))
@@ -530,7 +677,6 @@ test_that("concatenation performs expected allocations", {
 
     "Doubles to integer"
     with_memory_prof(list_unchop(dbls, ptype = int()))
-
 
     "# Concatenation with names"
 
@@ -611,7 +757,6 @@ test_that("dots splicing clones as appropriate", {
   x <- list(a = 1)
   vctrs::vec_c(!!!x)
   expect_equal(x, list(a = 1))
-
 
   x <- list(a = 1)
   vctrs::vec_cbind(!!!x, 2)

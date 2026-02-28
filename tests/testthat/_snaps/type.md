@@ -125,7 +125,7 @@
       vec_ptype_common(foo = TRUE, !!!list(bar = 1, "foo"))
     Condition
       Error:
-      ! Can't combine `foo` <double> and `..3` <character>.
+      ! Can't combine `bar` <double> and `..3` <character>.
 
 ---
 
@@ -168,4 +168,20 @@
     Condition
       Error:
       ! Can't combine `a` <character> and `z` <double>.
+
+# `.finalise` is validated
+
+    Code
+      vec_ptype_common(.finalise = 1)
+    Condition
+      Error in `vec_ptype_common()`:
+      ! `.finalise` must be `TRUE` or `FALSE`.
+
+---
+
+    Code
+      vec_ptype_common_params(.finalise = 1)
+    Condition
+      Error in `vec_ptype_common_params()`:
+      ! `.finalise` must be `TRUE` or `FALSE`.
 

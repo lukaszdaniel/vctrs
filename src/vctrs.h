@@ -6,9 +6,6 @@
 
 // Vector types -------------------------------------------------
 
-SEXP vec_unspecified(R_len_t n);
-bool vec_is_unspecified(SEXP x);
-
 
 #include "type-info.h"
 
@@ -26,8 +23,8 @@ bool vec_is_unspecified(SEXP x);
 #include "dim.h"
 #include "equal.h"
 #include "expand.h"
-#include "hash.h"
 #include "lazy.h"
+#include "list-combine.h"
 #include "match-compare.h"
 #include "match-joint.h"
 #include "missing.h"
@@ -35,9 +32,8 @@ bool vec_is_unspecified(SEXP x);
 #include "order-collate.h"
 #include "order-groups.h"
 #include "order-sortedness.h"
-#include "order-truelength.h"
 #include "order.h"
-#include "owned.h"
+#include "ownership.h"
 #include "poly-op.h"
 #include "proxy.h"
 #include "proxy-restore.h"
@@ -62,6 +58,7 @@ bool vec_is_unspecified(SEXP x);
 #include "typeof2-s3.h"
 #include "utils-dispatch.h"
 #include "utils.h"
+#include "unspecified.h"
 
 
 // Vector methods ------------------------------------------------
@@ -80,8 +77,6 @@ SEXP vec_proxy_unwrap(SEXP x);
 SEXP vec_slice_shaped(enum vctrs_type type, SEXP x, SEXP index);
 bool vec_requires_fallback(SEXP x, struct vctrs_proxy_info info);
 r_obj* vec_ptype(r_obj* x, struct vctrs_arg* x_arg, struct r_lazy call);
-SEXP vec_ptype_finalise(SEXP x);
-bool vec_is_unspecified(SEXP x);
 SEXP vec_names(SEXP x);
 SEXP vec_proxy_names(SEXP x);
 SEXP vec_group_loc(SEXP x);
@@ -97,11 +92,16 @@ SEXP vec_match(SEXP needles, SEXP haystack) {
   return vec_match_params(needles, haystack, true, NULL, NULL, r_lazy_null);
 }
 
+SEXP vec_in(
+  SEXP needles,
+  SEXP haystack,
+  bool na_equal,
+  struct vctrs_arg* p_needles_arg,
+  struct vctrs_arg* p_haystack_arg,
+  struct r_lazy call
+);
 
 bool is_data_frame(SEXP x);
-
-uint32_t hash_object(SEXP x);
-void hash_fill(uint32_t* p, R_len_t n, SEXP x, bool na_equal);
 
 SEXP vec_unique(SEXP x);
 bool duplicated_any(SEXP names);
@@ -151,7 +151,7 @@ static inline struct df_short_circuit_info new_df_short_circuit_info(R_len_t siz
     p_row_known = (bool*) RAW(row_known);
 
     // To begin with, no rows have a known comparison value
-    memset(p_row_known, false, size * sizeof(bool));
+    r_memset(p_row_known, false, size * sizeof(bool));
   }
 
   struct df_short_circuit_info info = {
@@ -199,9 +199,9 @@ SEXP posixlt_as_posixct(SEXP x, SEXP to);
 SEXP posixct_as_posixlt(SEXP x, SEXP to);
 SEXP posixlt_as_posixlt(SEXP x, SEXP to);
 
-SEXP vec_date_restore(SEXP x, SEXP to, const enum vctrs_owned owned);
-SEXP vec_posixct_restore(SEXP x, SEXP to, const enum vctrs_owned owned);
-SEXP vec_posixlt_restore(SEXP x, SEXP to, const enum vctrs_owned owned);
+SEXP vec_date_restore(SEXP x, SEXP to, const enum vctrs_ownership ownership);
+SEXP vec_posixct_restore(SEXP x, SEXP to, const enum vctrs_ownership ownership);
+SEXP vec_posixlt_restore(SEXP x, SEXP to, const enum vctrs_ownership ownership);
 
 SEXP date_datetime_ptype2(SEXP x, SEXP y);
 SEXP datetime_datetime_ptype2(SEXP x, SEXP y);
@@ -239,34 +239,5 @@ static inline void growable_push_int(struct growable* g, int i) {
   } while(0)
 
 #define UNPROTECT_GROWABLE(g) do { UNPROTECT(1);} while(0)
-
-// Conditions ---------------------------------------------------
-
-r_no_return
-void stop_scalar_type(SEXP x,
-                      struct vctrs_arg* arg,
-                      struct r_lazy call);
-__attribute__((noreturn))
-void stop_assert_size(r_ssize actual,
-                      r_ssize required,
-                      struct vctrs_arg* arg,
-                      struct r_lazy call);
-__attribute__((noreturn))
-void stop_incompatible_type(SEXP x,
-                            SEXP y,
-                            struct vctrs_arg* x_arg,
-                            struct vctrs_arg* y_arg,
-                            bool cast);
-__attribute__((noreturn))
-void stop_recycle_incompatible_size(r_ssize x_size,
-                                    r_ssize size,
-                                    struct vctrs_arg* x_arg,
-                                    struct r_lazy call);
-__attribute__((noreturn))
-void stop_incompatible_shape(SEXP x, SEXP y,
-                             R_len_t x_size, R_len_t y_size, int axis,
-                             struct vctrs_arg* p_x_arg, struct vctrs_arg* p_y_arg);
-void stop_corrupt_factor_levels(SEXP x, struct vctrs_arg* arg) __attribute__((noreturn));
-void stop_corrupt_ordered_levels(SEXP x, struct vctrs_arg* arg) __attribute__((noreturn));
 
 #endif

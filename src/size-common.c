@@ -1,6 +1,12 @@
 #include "vctrs.h"
 #include "decl/size-common-decl.h"
 
+struct size_common_reduce_opts {
+  // Updated at each iteration.
+  // Allows us to reuse `vec_size()` info from the previous iteration.
+  r_ssize current_size;
+  const struct r_lazy call;
+};
 
 // [[ register(external = TRUE) ]]
 r_obj* ffi_size_common(r_obj* ffi_call, r_obj* op, r_obj* args, r_obj* env) {
@@ -12,6 +18,7 @@ r_obj* ffi_size_common(r_obj* ffi_call, r_obj* op, r_obj* args, r_obj* env) {
 
   struct r_lazy internal_call = { .x = env, .env = r_null };
 
+  r_obj* xs = r_node_car(args); args = r_node_cdr(args);
   r_obj* size = r_node_car(args); args = r_node_cdr(args);
   r_obj* absent = r_node_car(args);
 
@@ -28,13 +35,7 @@ r_obj* ffi_size_common(r_obj* ffi_call, r_obj* op, r_obj* args, r_obj* env) {
                       r_c_str_format_error_arg(".absent"));
   }
 
-  struct size_common_opts size_opts = {
-    .p_arg = &arg,
-    .call = call
-  };
-
-  r_obj* xs = KEEP(rlang_env_dots_list(env));
-  r_ssize common = vec_size_common_opts(xs, -1, &size_opts);
+  r_ssize common = vec_size_common(xs, -1, &arg, call);
 
   r_obj* out;
   if (common < 0) {
@@ -49,76 +50,148 @@ r_obj* ffi_size_common(r_obj* ffi_call, r_obj* op, r_obj* args, r_obj* env) {
     out = r_int(common);
   }
 
-  FREE(1);
   return out;
 }
 
-r_ssize vec_size_common_opts(r_obj* xs,
-                             r_ssize absent,
-                             const struct size_common_opts* opts) {
-  struct size_common_opts mut_opts = *opts;
+r_ssize vec_size_common(
+  r_obj* xs,
+  r_ssize absent,
+  struct vctrs_arg* p_xs_arg,
+  struct r_lazy call
+) {
+  struct size_common_reduce_opts reduce_opts = {
+    .current_size = -1,
+    .call = call
+  };
 
-  r_obj* common = KEEP(reduce(r_null,
-                              vec_args.empty,
-                              opts->p_arg,
-                              xs,
-                              &vctrs_size2_common,
-                              &mut_opts));
-  r_ssize out;
+  // Interested in `reduce_opts.current_size`,
+  // not in the returned `r_obj*` from `reduce()`
+  reduce(
+    r_null,
+    vec_args.empty,
+    p_xs_arg,
+    xs,
+    &size2_common,
+    &reduce_opts
+  );
 
-  if (common == r_null) {
+  r_ssize out = reduce_opts.current_size;
+
+  if (out == -1) {
     out = absent;
-  } else {
-    out = vec_size(common);
   }
 
-  FREE(1);
   return out;
 }
 
-static
-r_obj* vctrs_size2_common(r_obj* x,
-                          r_obj* y,
-                          struct counters* counters,
-                          void* data) {
-  struct size_common_opts* opts = data;
-
-  if (x != r_null) {
-    obj_check_vector(x, counters->curr_arg, opts->call);
-  }
-  if (y != r_null) {
-    obj_check_vector(y, counters->next_arg, opts->call);
-  }
-
+/**
+ * `vec_size2()` implementation
+ *
+ * `left` works the same as `vec_typeof2_impl()`
+ *
+ * @param left Output parameter. Set to 1 when the common size comes
+ *   from the left, 0 when it comes from the right, and -1 when it
+ *   comes from both sides. This means that "left" is the default
+ *   when coerced to a boolean value.
+*/
+static inline
+r_obj* vec_size2_impl(
+  r_obj* x,
+  r_obj* y,
+  r_ssize x_size,
+  r_ssize y_size,
+  struct vctrs_arg* p_x_arg,
+  struct vctrs_arg* p_y_arg,
+  struct r_lazy call,
+  int* left
+) {
+  // `NULL` handling rules:
+  // - If `x` and `y` are `NULL`, do nothing
+  // - If `x` is `NULL`, use `y`
+  // - If `y` is `NULL`, use `x`
+  //
+  // The first rule is important to ensure that this works
+  // `vec_size_common(NULL, .absent = 5L)`
   if (x == r_null) {
-    counters_shift(counters);
-    return y;
+    if (y == r_null) {
+      *left = -1;
+      return x;
+    } else {
+      *left = 0;
+      return y;
+    }
   }
   if (y == r_null) {
-    return x;
+    if (x == r_null) {
+      r_stop_unreachable();
+    } else {
+      *left = 1;
+      return x;
+    }
   }
 
-  r_ssize nx = vec_size(x);
-  r_ssize ny = vec_size(y);
-
-  if (nx == ny) {
+  // Now apply common size rules
+  // - Same size, use `x`
+  // - Size 1 `x`, use `y`
+  // - Size 1 `y`, use `x`
+  if (x_size == y_size) {
+    *left = -1;
     return x;
   }
-  if (nx == 1) {
-    counters_shift(counters);
+  if (x_size == 1) {
+    *left = 0;
     return y;
   }
-  if (ny == 1) {
+  if (y_size == 1) {
+    *left = 1;
     return x;
   }
 
-  stop_incompatible_size(x,
-                         y,
-                         nx,
-                         ny,
-                         counters->curr_arg,
-                         counters->next_arg,
-                         opts->call);
+  stop_incompatible_size(
+    x,
+    y,
+    x_size,
+    y_size,
+    p_x_arg,
+    p_y_arg,
+    call
+  );
+}
+
+// Size2 computation
+//
+// `reduce_opts->current_size` updates when we switch to `y`
+static
+r_obj* size2_common(
+  r_obj* x,
+  r_obj* y,
+  struct counters* counters,
+  void* data
+) {
+  struct size_common_reduce_opts* reduce_opts = data;
+
+  const r_ssize x_size = reduce_opts->current_size;
+  const r_ssize y_size = vec_size_params(y, counters->next_arg, reduce_opts->call);
+
+  int left = -1;
+
+  r_obj* out = vec_size2_impl(
+    x,
+    y,
+    x_size,
+    y_size,
+    counters->curr_arg,
+    counters->next_arg,
+    reduce_opts->call,
+    &left
+  );
+
+  if (!left) {
+    counters_shift(counters);
+    reduce_opts->current_size = y_size;
+  }
+
+  return out;
 }
 
 // [[ register(external = TRUE) ]]
@@ -128,57 +201,85 @@ r_obj* ffi_recycle_common(r_obj* ffi_call, r_obj* op, r_obj* args, r_obj* env) {
   struct r_lazy call = { .x = syms.dot_call, .env = env };
   struct r_lazy internal_call = { .x = env, .env = r_null };
 
-  struct r_lazy arg_lazy = { .x = syms.dot_arg, .env = env };
-  struct vctrs_arg arg = new_lazy_arg(&arg_lazy);
+  struct r_lazy xs_arg_lazy = { .x = syms.dot_arg, .env = env };
+  struct vctrs_arg xs_arg = new_lazy_arg(&xs_arg_lazy);
 
-  struct size_common_opts size_opts = {
-    .p_arg = &arg,
-    .call = call
-  };
+  r_obj* xs = r_node_car(args); args = r_node_cdr(args);
+  r_obj* ffi_size = r_node_car(args);
 
-  r_obj* size = r_node_car(args); args = r_node_cdr(args);
-  r_obj* xs = KEEP(rlang_env_dots_list(env));
-
-  r_ssize common;
-  if (size == r_null) {
-    common = vec_size_common_opts(xs, -1, &size_opts);
+  r_ssize size;
+  if (ffi_size == r_null) {
+    size = vec_size_common(xs, -1, &xs_arg, call);
   } else {
-    common = vec_as_short_length(size,
-                                 vec_args.dot_size,
-                                 internal_call);
+    size = vec_as_short_length(
+      ffi_size,
+      vec_args.dot_size,
+      internal_call
+    );
   }
 
-  r_obj* out = vec_recycle_common_opts(xs, common, &size_opts);
+  r_obj* out = vec_recycle_common(xs, size, &xs_arg, call);
 
-  FREE(1);
   return out;
 }
 
-r_obj* vec_recycle_common_opts(r_obj* xs,
-                               r_ssize size,
-                               const struct size_common_opts* p_opts) {
+r_obj* vec_recycle_common(
+  r_obj* xs,
+  r_ssize size,
+  struct vctrs_arg* p_xs_arg,
+  struct r_lazy call
+) {
   if (size < 0) {
     return xs;
   }
 
-  xs = KEEP(r_clone_referenced(xs));
-  r_ssize n = vec_size(xs);
+  r_obj* const* v_xs = r_list_cbegin(xs);
+  const r_ssize xs_size = r_length(xs);
 
-  r_ssize i = 0;
-  struct vctrs_arg* p_x_arg = new_subscript_arg(p_opts->p_arg,
-                                                r_names(xs),
-                                                n,
-                                                &i);
+  r_ssize xs_index = 0;
+
+  struct vctrs_arg* p_x_arg = new_subscript_arg(
+    p_xs_arg,
+    r_names(xs),
+    xs_size,
+    &xs_index
+  );
   KEEP(p_x_arg->shelter);
 
-  for (; i < n; ++i) {
-    r_obj* elt = r_list_get(xs, i);
-    r_list_poke(xs, i, vec_check_recycle(elt,
-                                         size,
-                                         p_x_arg,
-                                         p_opts->call));
+  // If all elements are of size `size`, there is nothing to do
+  // and we can avoid an allocation
+  for (r_ssize i = 0; i < xs_size; ++i) {
+    r_obj* x = v_xs[i];
+
+    if (!vec_is_size(x, size, VCTRS_ALLOW_NULL_yes, p_x_arg, call)) {
+      break;
+    }
+
+    ++xs_index;
+  }
+
+  if (xs_index == xs_size) {
+    FREE(1);
+    return xs;
+  }
+
+  // Otherwise we need a new list
+  r_obj* out = KEEP(r_alloc_list(xs_size));
+  r_attrib_poke_names(out, r_names(xs));
+
+  // Copy over everything before `xs_index`
+  for (r_ssize i = 0; i < xs_index; ++i) {
+    r_obj* x = v_xs[i];
+    r_list_poke(out, i, x);
+  }
+
+  // Recycle everything at and after `xs_index`
+  for (r_ssize i = xs_index; i < xs_size; ++i) {
+    r_obj* x = v_xs[i];
+    r_list_poke(out, i, vec_recycle(x, size, p_x_arg, call));
+    ++xs_index;
   }
 
   FREE(2);
-  return xs;
+  return out;
 }

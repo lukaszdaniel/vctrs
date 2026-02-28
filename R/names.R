@@ -158,12 +158,21 @@
 #' # Universal repairing fixes any non-syntactic name:
 #' vec_as_names(c("_foo", "+"), repair = "universal")
 #' @export
-vec_as_names <- function(names,
-                         ...,
-                         repair = c("minimal", "unique", "universal", "check_unique", "unique_quiet", "universal_quiet"),
-                         repair_arg = NULL,
-                         quiet = FALSE,
-                         call = caller_env()) {
+vec_as_names <- function(
+  names,
+  ...,
+  repair = c(
+    "minimal",
+    "unique",
+    "universal",
+    "check_unique",
+    "unique_quiet",
+    "universal_quiet"
+  ),
+  repair_arg = NULL,
+  quiet = FALSE,
+  call = caller_env()
+) {
   check_dots_empty0(...)
   .Call(
     ffi_vec_as_names,
@@ -181,10 +190,7 @@ validate_name_repair_arg <- function(repair) {
 validate_minimal_names <- function(names, n = NULL) {
   .Call(vctrs_validate_minimal_names, names, n)
 }
-validate_unique <- function(names,
-                            arg = "",
-                            n = NULL,
-                            call = caller_env()) {
+validate_unique <- function(names, arg = "", n = NULL, call = caller_env()) {
   validate_minimal_names(names, n)
 
   empty_names <- detect_empty_names(names)
@@ -255,10 +261,19 @@ detect_dot_dot <- function(names) {
 #'
 #' vec_set_names(1:3, letters[1:3])
 #' vec_set_names(data.frame(a = 1:3), letters[1:3])
-vec_names2 <- function(x,
-                       ...,
-                       repair = c("minimal", "unique", "universal", "check_unique", "unique_quiet", "universal_quiet"),
-                       quiet = FALSE) {
+vec_names2 <- function(
+  x,
+  ...,
+  repair = c(
+    "minimal",
+    "unique",
+    "universal",
+    "check_unique",
+    "unique_quiet",
+    "universal_quiet"
+  ),
+  quiet = FALSE
+) {
   check_dots_empty0(...)
   repair <- validate_name_repair_arg(repair)
 
@@ -283,10 +298,19 @@ vec_names2 <- function(x,
     universal_quiet = as_universal_names(minimal_names(x), quiet = TRUE)
   )
 }
-vec_repair_names <- function(x,
-                             repair = c("minimal", "unique", "universal", "check_unique", "unique_quiet", "universal_quiet"),
-                             ...,
-                             quiet = FALSE) {
+vec_repair_names <- function(
+  x,
+  repair = c(
+    "minimal",
+    "unique",
+    "universal",
+    "check_unique",
+    "unique_quiet",
+    "universal_quiet"
+  ),
+  ...,
+  quiet = FALSE
+) {
   if (is.data.frame(x)) {
     x
   } else {
@@ -337,7 +361,11 @@ two_to_three_dots <- function(names) {
 }
 append_pos <- function(names, needs_suffix) {
   need_append_pos <- which(needs_suffix)
-  names[need_append_pos] <- paste0(names[need_append_pos], "...", need_append_pos)
+  names[need_append_pos] <- paste0(
+    names[need_append_pos],
+    "...",
+    need_append_pos
+  )
   names
 }
 strip_pos <- function(names) {
@@ -347,9 +375,9 @@ strip_pos <- function(names) {
 
 # Makes each individual name syntactic but does not enforce unique-ness
 make_syntactic <- function(names) {
-  names[is.na(names)]       <- ""
-  names[names == ""]        <- "."
-  names[names == "..."]     <- "...."
+  names[is.na(names)] <- ""
+  names[names == ""] <- "."
+  names[names == "..."] <- "...."
   names <- sub("^_", "._", names)
 
   new_names <- make.names(names)
@@ -390,12 +418,12 @@ re_match <- function(text, pattern, perl = TRUE, ...) {
 
   match <- regexpr(pattern, text, perl = perl, ...)
 
-  start  <- as.vector(match)
+  start <- as.vector(match)
   length <- attr(match, "match.length")
-  end    <- start + length - 1L
+  end <- start + length - 1L
 
   matchstr <- substring(text, start, end)
-  matchstr[ start == -1 ] <- NA_character_
+  matchstr[start == -1] <- NA_character_
 
   res <- data.frame(
     stringsAsFactors = FALSE,
@@ -404,13 +432,12 @@ re_match <- function(text, pattern, perl = TRUE, ...) {
   )
 
   if (!is.null(attr(match, "capture.start"))) {
-
-    gstart  <- attr(match, "capture.start")
+    gstart <- attr(match, "capture.start")
     glength <- attr(match, "capture.length")
-    gend    <- gstart + glength - 1L
+    gend <- gstart + glength - 1L
 
     groupstr <- substring(text, gstart, gend)
-    groupstr[ gstart == -1 ] <- NA_character_
+    groupstr[gstart == -1] <- NA_character_
     dim(groupstr) <- dim(gstart)
 
     res <- cbind(groupstr, res, stringsAsFactors = FALSE)
@@ -458,7 +485,7 @@ set_names_dispatch <- function(x, names) {
 #' @rdname vec_names
 #' @export
 vec_set_names <- function(x, names) {
-  .Call(vctrs_set_names, x, names)
+  .Call(ffi_vec_set_names, x, names)
 }
 
 #' Repair names with legacy method
@@ -553,6 +580,10 @@ vec_as_names_legacy <- function(names, prefix = "V", sep = "") {
 #'
 #'   * A glue specification of the form `"{outer}_{inner}"`.
 #'
+#'   * `"inner"`, in which case outer names are ignored, and inner
+#'     names are used if they exist. Note that outer names may still
+#'     be used to provide informative error messages.
+#'
 #'   * An [rlang::zap()] object, in which case both outer and inner
 #'     names are ignored and the result is unnamed.
 #'
@@ -577,6 +608,16 @@ vec_as_names_legacy <- function(names, prefix = "V", sep = "") {
 #'
 #' # Or purrr-style formulas for anonymous functions:
 #' vec_c(name = 1:3, other = 4:5, .name_spec = ~ paste0(.x, .y))
+#'
+#' # Or the string `"inner"` to only use inner names
+#' vec_c(name = 1:3, outer = 4:5, .name_spec = "inner")
+#' vec_c(name = c(a = 1, b = 2, c = 3), outer = 4:5, .name_spec = "inner")
+#' # This can be useful when you want outer names mentioned in error messages,
+#' # but you don't want them interfering with the result
+#' try(vec_c(x = c(a = 1), y = c(b = "2"), .name_spec = "inner"))
+#'
+#' # Or `rlang::zap()` to ignore both outer and inner names entirely
+#' vec_c(name = c(a = 1, b = 2), outer = c(c = 3), .name_spec = rlang::zap())
 #' @name name_spec
 NULL
 

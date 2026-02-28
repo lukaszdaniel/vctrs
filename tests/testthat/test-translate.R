@@ -1,6 +1,20 @@
 # ------------------------------------------------------------------------------
 # vec_normalize_encoding()
 
+test_that("get expected normalized-ness of various encodings", {
+  x <- unlist(encodings(bytes = TRUE), use.names = FALSE)
+
+  # For the `°C` strings:
+  # - `TRUE`  for marked as `CE_UTF8`
+  # - `FALSE` for marked as `CE_NATIVE`, even if `utf8locale = true`
+  # - `FALSE` for marked as `CE_LATIN1`
+  # - `FALSE` for marked as `CE_BYTES`
+  expect_identical(
+    chr_is_normalized(x),
+    c(TRUE, FALSE, FALSE, FALSE)
+  )
+})
+
 test_that("can translate a character vector of various encodings (#553)", {
   x <- unlist(encodings(), use.names = FALSE)
 
@@ -34,7 +48,10 @@ test_that("translation fails purposefully with any bytes", {
 test_that("translation fails purposefully when mixing with bytes with other encodings", {
   for (enc in encodings()) {
     x <- c(encoding_bytes(), enc)
-    expect_error(vec_normalize_encoding(x), "translating strings with \"bytes\" encoding")
+    expect_error(
+      vec_normalize_encoding(x),
+      "translating strings with \"bytes\" encoding"
+    )
   }
 })
 

@@ -1,13 +1,10 @@
 #include "vctrs-core.h"
 #include "vctrs.h"
 #include "type-data-frame.h"
+#include "vec-bool.h"
 #include <R_ext/Rdynload.h>
 
 // Initialised at load time
-bool (*rlang_is_splice_box)(SEXP) = NULL;
-SEXP (*rlang_unbox)(SEXP) = NULL;
-SEXP (*rlang_env_dots_values)(SEXP) = NULL;
-SEXP (*rlang_env_dots_list)(SEXP) = NULL;
 SEXP vctrs_method_table = NULL;
 SEXP base_method_table = NULL;
 SEXP s4_c_method_table = NULL;
@@ -258,66 +255,6 @@ SEXP vctrs_new_df_unshared_col(void) {
   return out;
 }
 
-// An alternative to `attributes(x) <- attrib`, which makes
-// two copies on R < 3.6.0
-// [[ register() ]]
-SEXP vctrs_set_attributes(SEXP x, SEXP attrib) {
-  R_len_t n_attrib = Rf_length(attrib);
-  int n_protect = 0;
-
-  x = PROTECT(r_clone_referenced(x));
-  ++n_protect;
-
-  // Remove existing attributes, and unset the object bit
-  SET_ATTRIB(x, R_NilValue);
-  SET_OBJECT(x, 0);
-
-  // Possible early exit after removing attributes
-  if (n_attrib == 0) {
-    UNPROTECT(n_protect);
-    return x;
-  }
-
-  SEXP names = Rf_getAttrib(attrib, R_NamesSymbol);
-
-  if (Rf_isNull(names)) {
-    Rf_errorcall(R_NilValue, "Attributes must be named.");
-  }
-
-  // Check that each element of `names` is named.
-  for (R_len_t i = 0; i < n_attrib; ++i) {
-    SEXP name = STRING_ELT(names, i);
-
-    if (name == NA_STRING || name == R_BlankString) {
-      const char* msg = "All attributes must have names. Attribute %i does not.";
-      Rf_errorcall(R_NilValue, msg, i + 1);
-    }
-  }
-
-  // Always set `dim` first, if it exists. This way it is set before `dimnames`.
-  int dim_pos = -1;
-  for (R_len_t i = 0; i < n_attrib; ++i) {
-    if (!strcmp(CHAR(STRING_ELT(names, i)), "dim")) {
-      dim_pos = i;
-      break;
-    }
-  }
-
-  if (dim_pos != -1) {
-    Rf_setAttrib(x, R_DimSymbol, VECTOR_ELT(attrib, dim_pos));
-  }
-
-  for (R_len_t i = 0; i < n_attrib; ++i) {
-    if (i == dim_pos) {
-      continue;
-    }
-    Rf_setAttrib(x, Rf_installChar(STRING_ELT(names, i)), VECTOR_ELT(attrib, i));
-  }
-
-  UNPROTECT(n_protect);
-  return x;
-}
-
 // [[ include("utils.h") ]]
 SEXP map(SEXP x, SEXP (*fn)(SEXP)) {
   R_len_t n = Rf_length(x);
@@ -353,11 +290,15 @@ SEXP map_with_data(SEXP x, SEXP (*fn)(SEXP, void*), void* data) {
 SEXP bare_df_map(SEXP df, SEXP (*fn)(SEXP)) {
   SEXP out = PROTECT(map(df, fn));
 
-  // Total ownership because `map()` generates a fresh list
-  out = vec_bare_df_restore(out,
-                            df,
-                            VCTRS_OWNED_true,
-                            VCTRS_RECURSE_false);
+  // Shallow ownership over `out` because `map()` generates a fresh
+  // list. We only care about "restoring" that bare list to the type of `df`,
+  // not the columns, so not recursive.
+  struct vec_restore_opts opts = {
+    .ownership = VCTRS_OWNERSHIP_shallow,
+    .recursively_proxied = false
+  };
+
+  out = vec_bare_df_restore(out, df, &opts);
 
   UNPROTECT(1);
   return out;
@@ -367,11 +308,15 @@ SEXP bare_df_map(SEXP df, SEXP (*fn)(SEXP)) {
 SEXP df_map(SEXP df, SEXP (*fn)(SEXP)) {
   SEXP out = PROTECT(map(df, fn));
 
-  // Total ownership because `map()` generates a fresh list
-  out = vec_df_restore(out,
-                       df,
-                       VCTRS_OWNED_true,
-                       VCTRS_RECURSE_false);
+  // Shallow ownership over `out` because `map()` generates a fresh
+  // list. We only care about "restoring" that bare list to the type of `df`,
+  // not the contents, so not recursive.
+  struct vec_restore_opts opts = {
+    .ownership = VCTRS_OWNERSHIP_shallow,
+    .recursively_proxied = false
+  };
+
+  out = vec_df_restore(out, df, &opts);
 
   UNPROTECT(1);
   return out;
@@ -389,7 +334,7 @@ SEXP df_map(SEXP df, SEXP (*fn)(SEXP)) {
                                                                \
   r_ssize copy_size = (size > x_size) ? x_size : size;         \
                                                                \
-  memcpy(p_out, p_x, copy_size * sizeof(CTYPE));               \
+  r_memcpy(p_out, p_x, copy_size * sizeof(CTYPE));             \
                                                                \
   UNPROTECT(1);                                                \
   return out;                                                  \
@@ -450,9 +395,9 @@ SEXP s3_paste_method_sym(const char* generic, const char* cls) {
 
   char* buf = s3_buf;
 
-  memcpy(buf, generic, gen_len); buf += gen_len;
+  r_memcpy(buf, generic, gen_len); buf += gen_len;
   *buf = '.'; ++buf;
-  memcpy(buf, cls, cls_len); buf += cls_len;
+  r_memcpy(buf, cls, cls_len); buf += cls_len;
   *buf = '\0';
 
   return Rf_install(s3_buf);
@@ -464,14 +409,21 @@ SEXP s3_get_method(const char* generic, const char* cls, SEXP table) {
   return s3_sym_get_method(sym, table);
 }
 SEXP s3_sym_get_method(SEXP sym, SEXP table) {
-  SEXP method = r_env_get(R_GlobalEnv, sym);
-  if (r_is_function(method)) {
-    return method;
+  // `r_env_get()` errors on missing bindings,
+  // so we have to check with `r_env_has()`
+
+  if (r_env_has(R_GlobalEnv, sym)) {
+    SEXP method = r_env_get(R_GlobalEnv, sym);
+    if (r_is_function(method)) {
+      return method;
+    }
   }
 
-  method = r_env_get(table, sym);
-  if (r_is_function(method)) {
-    return method;
+  if (r_env_has(table, sym)) {
+    SEXP method = r_env_get(table, sym);
+    if (r_is_function(method)) {
+      return method;
+    }
   }
 
   return R_NilValue;
@@ -497,7 +449,7 @@ r_obj* ffi_s3_get_method(r_obj* generic, r_obj* cls, r_obj* table) {
 
 // [[ include("utils.h") ]]
 SEXP s3_find_method(const char* generic, SEXP x, SEXP table) {
-  if (!OBJECT(x)) {
+  if (!r_is_object(x)) {
     return R_NilValue;
   }
 
@@ -510,7 +462,7 @@ SEXP s3_find_method(const char* generic, SEXP x, SEXP table) {
 
 // [[ include("utils.h") ]]
 SEXP s3_class_find_method(const char* generic, SEXP cls, SEXP table) {
-  // Avoid corrupt objects where `x` is an OBJECT(), but the class is NULL
+  // Avoid corrupt objects where `x` passes `r_is_object()`, but the class is NULL
   if (cls == R_NilValue) {
     return R_NilValue;
   }
@@ -532,12 +484,12 @@ SEXP s3_class_find_method(const char* generic, SEXP cls, SEXP table) {
 SEXP s3_get_class(SEXP x) {
   SEXP cls = R_NilValue;
 
-  if (OBJECT(x)) {
+  if (r_is_object(x)) {
     cls = Rf_getAttrib(x, R_ClassSymbol);
   }
 
   // This handles unclassed objects as well as gremlins objects where
-  // `x` is an OBJECT(), but the class is NULL
+  // `x` passes `r_is_object()`, but the class is NULL
   if (cls == R_NilValue) {
     cls = s3_bare_class(x);
   }
@@ -624,9 +576,13 @@ SEXP s3_bare_class(SEXP x) {
 static SEXP s4_get_method(const char* cls, SEXP table) {
   SEXP sym = Rf_install(cls);
 
-  SEXP method = r_env_get(table, sym);
-  if (r_is_function(method)) {
-    return method;
+  // `r_env_get()` errors on missing bindings,
+  // so we have to check with `r_env_has()`
+  if (r_env_has(table, sym)) {
+    SEXP method = r_env_get(table, sym);
+    if (r_is_function(method)) {
+      return method;
+    }
   }
 
   return R_NilValue;
@@ -634,7 +590,7 @@ static SEXP s4_get_method(const char* cls, SEXP table) {
 
 // For S4 objects, the `table` is specific to the generic
 SEXP s4_find_method(SEXP x, SEXP table) {
-  if (!IS_S4_OBJECT(x)) {
+  if (!r_is_s4(x)) {
     return R_NilValue;
   }
 
@@ -645,7 +601,7 @@ SEXP s4_find_method(SEXP x, SEXP table) {
   return out;
 }
 SEXP s4_class_find_method(SEXP cls, SEXP table) {
-  // Avoid corrupt objects where `x` is an OBJECT(), but the class is NULL
+  // Avoid corrupt objects where `x` passes `r_is_object()`, but the class is NULL
   if (cls == R_NilValue) {
     return R_NilValue;
   }
@@ -706,36 +662,6 @@ SEXP list_first_non_null(SEXP xs, R_len_t* non_null_i) {
     *non_null_i = i;
   }
   return x;
-}
-
-// [[ include("utils.h") ]]
-bool list_is_homogeneously_classed(SEXP xs) {
-  R_len_t n = Rf_length(xs);
-  if (n == 0 || n == 1) {
-    return true;
-  }
-
-  R_len_t i = -1;
-  SEXP first = list_first_non_null(xs, &i);
-  SEXP first_class = PROTECT(r_class(first));
-
-  for (; i < n; ++i) {
-    SEXP this = VECTOR_ELT(xs, i);
-    if (this == R_NilValue) {
-      continue;
-    }
-    SEXP this_class = PROTECT(r_class(this));
-
-    if (!equal_object(first_class, this_class)) {
-      UNPROTECT(2);
-      return false;
-    }
-
-    UNPROTECT(1);
-  }
-
-  UNPROTECT(1);
-  return true;
 }
 
 // [[ include("utils.h") ]]
@@ -832,6 +758,15 @@ void init_compact_seq(int* p, R_len_t start, R_len_t size, bool increasing) {
   p[2] = step;
 }
 
+// Exported for testing with `list_combine()`
+r_obj* ffi_compact_seq(r_obj* ffi_start, r_obj* ffi_size, r_obj* ffi_increasing) {
+  return compact_seq(
+    r_arg_as_ssize(ffi_start, "start"),
+    r_arg_as_ssize(ffi_size, "size"),
+    r_arg_as_bool(ffi_increasing, "increasing")
+  );
+}
+
 // Returns a compact sequence that `vec_slice()` understands
 // The sequence is generally generated as `[start, start +/- size)`
 // If `size == 0` a 0-length sequence is generated
@@ -923,15 +858,123 @@ SEXP compact_rep_materialize(SEXP x) {
   return out;
 }
 
-bool is_compact(SEXP x) {
-  return is_compact_rep(x) || is_compact_seq(x);
+// Initialised at load time
+SEXP compact_condition_attrib = NULL;
+
+/**
+ * Compact condition index
+ *
+ * A condition index usable with `VCTRS_INDEX_STYLE_condition`
+ * that is backed by a RAWSXP bool array rather than a LGLSXP.
+ *
+ * Extremely useful when you only have `true` and `false` values
+ * and you construct the index at the C level (like `default`
+ * locations in `list_combine()`).
+ *
+ * Using a bool array is 4x less memory than a LGLSXP, and is
+ * faster due to being able to load more of the array into a
+ * single cache line.
+ */
+r_obj* new_compact_condition(R_xlen_t size) {
+  if (size < 0) {
+    r_stop_internal("Negative `size` in `compact_condition()`.");
+  }
+
+  r_obj* out = KEEP(r_alloc_raw(size * sizeof(bool)));
+
+  SET_ATTRIB(out, compact_condition_attrib);
+
+  FREE(1);
+  return out;
 }
 
-SEXP compact_materialize(SEXP x) {
+bool is_compact_condition(r_obj* x) {
+  return ATTRIB(x) == compact_condition_attrib;
+}
+
+r_ssize compact_condition_size(r_obj* x) {
+  // Should always be the same as the length, but you never know
+  return r_length(x) / sizeof(bool);
+}
+
+// Materializes as its corresponding logical index.
+// Maintains `index_style` of `VCTRS_INDEX_STYLE_condition`.
+r_obj* compact_condition_materialize(r_obj* x) {
+  const bool* v_x = compact_condition_cbegin(x);
+  const r_ssize size = compact_condition_size(x);
+
+  r_obj* out = KEEP(r_alloc_logical(size));
+  int* v_out = r_lgl_begin(out);
+
+  for (r_ssize i = 0; i < size; ++i) {
+    v_out[i] = v_x[i];
+  }
+
+  FREE(1);
+  return out;
+}
+
+// Materializes as its corresponding `VCTRS_INDEX_STYLE_location` index
+r_obj* compact_condition_materialize_location(r_obj* x) {
+  const bool* v_x = compact_condition_cbegin(x);
+  const r_ssize size = compact_condition_size(x);
+  return p_bool_which(v_x, size);
+}
+
+bool* compact_condition_begin(r_obj* x) {
+  return (bool*) r_raw_begin(x);
+}
+const bool* compact_condition_cbegin(r_obj* x) {
+  return (const bool*) r_raw_cbegin(x);
+}
+
+r_ssize compact_condition_sum(r_obj* x) {
+  const bool* v_x = compact_condition_cbegin(x);
+  const r_ssize size = compact_condition_size(x);
+  return p_bool_sum(v_x, size);
+}
+
+// Exported for testing with `vec_assign_compact_condition()`
+r_obj* ffi_as_compact_condition(r_obj* x) {
+  if (r_typeof(x) != R_TYPE_logical) {
+    r_stop_internal("`x` must be a logical condition vector.");
+  }
+
+  const r_ssize size = r_length(x);
+  const int* v_x = r_lgl_cbegin(x);
+
+  r_obj* out = KEEP(new_compact_condition(size));
+  bool* v_out = compact_condition_begin(out);
+
+  for (r_ssize i = 0; i < size; ++i) {
+    const int elt = v_x[i];
+
+    if (elt == r_globals.na_int) {
+      r_stop_internal("Can't use `NA` when creating a `compact_condition`.");
+    }
+
+    v_out[i] = elt;
+  }
+
+  FREE(1);
+  return out;
+}
+
+// Materialize the subscript as its corresponding `index_style`
+//
+// - integer -> `VCTRS_INDEX_STYLE_location`
+// - compact_rep -> `VCTRS_INDEX_STYLE_location`
+// - compact_seq -> `VCTRS_INDEX_STYLE_location`
+//
+// - logical -> `VCTRS_INDEX_STYLE_condition`
+// - compact_condition -> `VCTRS_INDEX_STYLE_condition`
+SEXP vec_subscript_materialize(SEXP x) {
   if (is_compact_rep(x)) {
     return compact_rep_materialize(x);
   } else if (is_compact_seq(x)) {
     return compact_seq_materialize(x);
+  } else if (is_compact_condition(x)) {
+    return compact_condition_materialize(x);
   } else {
     return x;
   }
@@ -942,8 +985,18 @@ R_len_t vec_subscript_size(SEXP x) {
     return r_int_get(x, 1);
   } else if (is_compact_seq(x)) {
     return r_int_get(x, 1);
+  } else if (is_compact_condition(x)) {
+    return compact_condition_size(x);
   } else {
     return vec_size(x);
+  }
+}
+
+r_ssize vec_condition_subscript_sum(r_obj* x, bool na_true) {
+  if (is_compact_condition(x)) {
+    return compact_condition_sum(x);
+  } else {
+    return r_lgl_sum(x, na_true);
   }
 }
 
@@ -1067,9 +1120,6 @@ void r_lgl_fill(SEXP x, int value, R_len_t n) {
 void r_int_fill(SEXP x, int value, R_len_t n) {
   r_p_int_fill(INTEGER(x), value, n);
 }
-// void r_chr_fill(SEXP x, SEXP value, R_len_t n) {
-//   r_p_chr_fill(STRING_PTR(x), value, n);
-// }
 
 
 void r_int_fill_seq(SEXP x, int start, R_len_t n) {
@@ -1125,6 +1175,40 @@ bool r_int_any_na(SEXP x) {
   return false;
 }
 
+// Treats missing values as `false`
+bool r_lgl_any(r_obj* x) {
+  if (r_typeof(x) != R_TYPE_logical) {
+    r_stop_internal("`x` must be a logical vector.");
+  }
+
+  const int* v_x = r_lgl_cbegin(x);
+  r_ssize size = r_length(x);
+
+  for (r_ssize i = 0; i < size; ++i) {
+    if (v_x[i] == 1) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// Like `!x` at the R level
+r_obj* r_lgl_invert(r_obj* x) {
+  const r_ssize size = r_length(x);
+  const int* v_x = r_lgl_cbegin(x);
+
+  r_obj* out = KEEP(r_alloc_logical(size));
+  int* v_out = r_lgl_begin(out);
+
+  for (r_ssize i = 0; i < size; ++i) {
+    const int elt = v_x[i];
+    v_out[i] = (elt == r_globals.na_lgl) ? r_globals.na_lgl : !elt;
+  }
+
+  FREE(1);
+  return out;
+}
 
 int r_chr_max_len(SEXP x) {
   R_len_t n = Rf_length(x);
@@ -1153,7 +1237,7 @@ SEXP r_chr_iota(R_len_t n, char* buf, int len, const char* prefix) {
     r_stop_internal("Prefix is larger than iota buffer.");
   }
 
-  memcpy(buf, prefix, prefix_len);
+  r_memcpy(buf, prefix, prefix_len);
   len -= prefix_len;
   char* beg = buf + prefix_len;
 
@@ -1291,18 +1375,6 @@ bool r_is_empty_names(SEXP x) {
   }
 
   return true;
-}
-
-SEXP r_env_get(SEXP env, SEXP sym) {
-  SEXP obj = PROTECT(Rf_findVarInFrame3(env, sym, FALSE));
-
-  // Force lazy loaded bindings
-  if (TYPEOF(obj) == PROMSXP) {
-    obj = Rf_eval(obj, R_BaseEnv);
-  }
-
-  UNPROTECT(1);
-  return obj;
 }
 
 SEXP r_clone_referenced(SEXP x) {
@@ -1483,8 +1555,14 @@ SEXP vctrs_shared_empty_str = NULL;
 SEXP vctrs_shared_empty_date = NULL;
 
 Rcomplex vctrs_shared_na_cpl;
-SEXP vctrs_shared_na_lgl = NULL;
-SEXP vctrs_shared_na_list = NULL;
+
+SEXP vctrs_shared_missing_lgl = NULL;
+SEXP vctrs_shared_missing_int = NULL;
+SEXP vctrs_shared_missing_dbl = NULL;
+SEXP vctrs_shared_missing_cpl = NULL;
+SEXP vctrs_shared_missing_raw = NULL;
+SEXP vctrs_shared_missing_chr = NULL;
+SEXP vctrs_shared_missing_list = NULL;
 
 SEXP vctrs_shared_zero_int = NULL;
 
@@ -1594,6 +1672,7 @@ SEXP syms_stop_matches_relationship_one_to_one = NULL;
 SEXP syms_stop_matches_relationship_one_to_many = NULL;
 SEXP syms_stop_matches_relationship_many_to_one = NULL;
 SEXP syms_warn_matches_relationship_many_to_many = NULL;
+SEXP syms_stop_combine_unmatched = NULL;
 SEXP syms_action = NULL;
 SEXP syms_vctrs_common_class_fallback = NULL;
 SEXP syms_fallback_class = NULL;
@@ -1605,12 +1684,16 @@ SEXP syms_required = NULL;
 SEXP syms_call = NULL;
 SEXP syms_dot_call = NULL;
 SEXP syms_which = NULL;
+SEXP syms_slice_value = NULL;
+SEXP syms_index_style = NULL;
+SEXP syms_loc = NULL;
 
 SEXP fns_bracket = NULL;
 SEXP fns_quote = NULL;
 SEXP fns_names = NULL;
 
-SEXP result_attrib = NULL;
+SEXP rlang_result_names = NULL;
+SEXP rlang_result_class = NULL;
 
 
 SEXP r_new_shared_vector(SEXPTYPE type, R_len_t n) {
@@ -1808,11 +1891,27 @@ void vctrs_init_utils(SEXP ns) {
   vctrs_shared_na_cpl.i = NA_REAL;
   vctrs_shared_na_cpl.r = NA_REAL;
 
-  vctrs_shared_na_lgl = r_new_shared_vector(LGLSXP, 1);
-  LOGICAL(vctrs_shared_na_lgl)[0] = NA_LOGICAL;
+  vctrs_shared_missing_lgl = r_new_shared_vector(LGLSXP, 1);
+  LOGICAL(vctrs_shared_missing_lgl)[0] = NA_LOGICAL;
 
-  vctrs_shared_na_list = r_new_shared_vector(VECSXP, 1);
-  SET_VECTOR_ELT(vctrs_shared_na_list, 0, R_NilValue);
+  vctrs_shared_missing_int = r_new_shared_vector(INTSXP, 1);
+  INTEGER(vctrs_shared_missing_int)[0] = NA_INTEGER;
+
+  vctrs_shared_missing_dbl = r_new_shared_vector(REALSXP, 1);
+  REAL(vctrs_shared_missing_dbl)[0] = NA_REAL;
+
+  vctrs_shared_missing_cpl = r_new_shared_vector(CPLXSXP, 1);
+  COMPLEX(vctrs_shared_missing_cpl)[0] = vctrs_shared_na_cpl;
+
+  // No actual `NA` value for raw, but we always use `0`
+  vctrs_shared_missing_raw = r_new_shared_vector(RAWSXP, 1);
+  RAW(vctrs_shared_missing_raw)[0] = 0;
+
+  vctrs_shared_missing_chr = r_new_shared_vector(STRSXP, 1);
+  SET_STRING_ELT(vctrs_shared_missing_chr, 0, NA_STRING);
+
+  vctrs_shared_missing_list = r_new_shared_vector(VECSXP, 1);
+  SET_VECTOR_ELT(vctrs_shared_missing_list, 0, R_NilValue);
 
   vctrs_shared_zero_int = r_new_shared_vector(INTSXP, 1);
   INTEGER(vctrs_shared_zero_int)[0] = 0;
@@ -1876,6 +1975,7 @@ void vctrs_init_utils(SEXP ns) {
   syms_stop_matches_relationship_one_to_many = Rf_install("stop_matches_relationship_one_to_many");
   syms_stop_matches_relationship_many_to_one = Rf_install("stop_matches_relationship_many_to_one");
   syms_warn_matches_relationship_many_to_many = Rf_install("warn_matches_relationship_many_to_many");
+  syms_stop_combine_unmatched = Rf_install("stop_combine_unmatched");
   syms_action = Rf_install("action");
   syms_vctrs_common_class_fallback = Rf_install(c_strs_vctrs_common_class_fallback);
   syms_fallback_class = Rf_install("fallback_class");
@@ -1887,6 +1987,9 @@ void vctrs_init_utils(SEXP ns) {
   syms_call = Rf_install("call");
   syms_dot_call = Rf_install(".call");
   syms_which = Rf_install("which");
+  syms_slice_value = Rf_install("slice_value");
+  syms_index_style = Rf_install("index_style");
+  syms_loc = Rf_install("loc");
 
   fns_bracket = Rf_findVar(syms_bracket, R_BaseEnv);
   fns_quote = Rf_findVar(Rf_install("quote"), R_BaseEnv);
@@ -1898,10 +2001,6 @@ void vctrs_init_utils(SEXP ns) {
   new_env__parent_node = CDDR(new_env_call);
   new_env__size_node = CDR(new_env__parent_node);
 
-  rlang_is_splice_box = (bool (*)(SEXP)) R_GetCCallable("rlang", "rlang_is_splice_box");
-  rlang_unbox = (SEXP (*)(SEXP)) R_GetCCallable("rlang", "rlang_unbox");
-  rlang_env_dots_values = (SEXP (*)(SEXP)) R_GetCCallable("rlang", "rlang_env_dots_values");
-  rlang_env_dots_list = (SEXP (*)(SEXP)) R_GetCCallable("rlang", "rlang_env_dots_list");
   rlang_sym_as_character = (SEXP (*)(SEXP)) R_GetCCallable("rlang", "rlang_sym_as_character");
 
   syms_as_data_frame2 = Rf_install("as.data.frame2");
@@ -1918,24 +2017,18 @@ void vctrs_init_utils(SEXP ns) {
   R_PreserveObject(compact_rep_attrib);
   SET_TAG(compact_rep_attrib, Rf_install("vctrs_compact_rep"));
 
-  {
-    SEXP result_names = PROTECT(Rf_allocVector(STRSXP, 2));
-    SET_STRING_ELT(result_names, 0, Rf_mkChar("ok"));
-    SET_STRING_ELT(result_names, 1, Rf_mkChar("err"));
+  compact_condition_attrib = Rf_cons(R_NilValue, R_NilValue);
+  R_PreserveObject(compact_condition_attrib);
+  SET_TAG(compact_condition_attrib, Rf_install("vctrs_compact_condition"));
 
-    result_attrib = PROTECT(Rf_cons(result_names, R_NilValue));
-    SET_TAG(result_attrib, R_NamesSymbol);
+  rlang_result_names = Rf_allocVector(STRSXP, 2);
+  R_PreserveObject(rlang_result_names);
+  SET_STRING_ELT(rlang_result_names, 0, Rf_mkChar("ok"));
+  SET_STRING_ELT(rlang_result_names, 1, Rf_mkChar("err"));
 
-    SEXP result_class = PROTECT(Rf_allocVector(STRSXP, 1));
-    SET_STRING_ELT(result_class, 0, Rf_mkChar("rlang_result"));
-
-    result_attrib = PROTECT(Rf_cons(result_class, result_attrib));
-    SET_TAG(result_attrib, R_ClassSymbol);
-
-    R_PreserveObject(result_attrib);
-    MARK_NOT_MUTABLE(result_attrib);
-    UNPROTECT(4);
-  }
+  rlang_result_class = Rf_allocVector(STRSXP, 1);
+  R_PreserveObject(rlang_result_class);
+  SET_STRING_ELT(rlang_result_class, 0, Rf_mkChar("rlang_result"));
 
   // We assume the following in `union vctrs_dbl_indicator`
   VCTRS_ASSERT(sizeof(double) == sizeof(int64_t));

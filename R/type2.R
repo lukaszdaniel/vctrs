@@ -28,12 +28,14 @@
 #' - [vec_ptype()] is applied to `x` and `y`
 #'
 #' @export
-vec_ptype2 <- function(x,
-                       y,
-                       ...,
-                       x_arg = caller_arg(x),
-                       y_arg = caller_arg(y),
-                       call = caller_env()) {
+vec_ptype2 <- function(
+  x,
+  y,
+  ...,
+  x_arg = caller_arg(x),
+  y_arg = caller_arg(y),
+  call = caller_env()
+) {
   if (!missing(...)) {
     check_ptype2_dots_empty(...)
     return(vec_ptype2_opts(
@@ -48,21 +50,25 @@ vec_ptype2 <- function(x,
   return(.Call(ffi_ptype2, x, y, environment()))
   UseMethod("vec_ptype2")
 }
-vec_ptype2_dispatch_s3 <- function(x,
-                                   y,
-                                   ...,
-                                   x_arg = "",
-                                   y_arg = "",
-                                   call = caller_env()) {
+vec_ptype2_dispatch_s3 <- function(
+  x,
+  y,
+  ...,
+  x_arg = "",
+  y_arg = "",
+  call = caller_env()
+) {
   UseMethod("vec_ptype2")
 }
 
-vec_ptype2_dispatch_native <- function(x,
-                                       y,
-                                       ...,
-                                       x_arg = "",
-                                       y_arg = "",
-                                       call = caller_env()) {
+vec_ptype2_dispatch_native <- function(
+  x,
+  y,
+  ...,
+  x_arg = "",
+  y_arg = "",
+  call = caller_env()
+) {
   fallback_opts <- match_fallback_opts(...)
   .Call(
     ffi_ptype2_dispatch_native,
@@ -98,12 +104,14 @@ vec_ptype2_dispatch_native <- function(x,
 #'
 #' @keywords internal
 #' @export
-vec_default_ptype2 <- function(x,
-                               y,
-                               ...,
-                               x_arg = "",
-                               y_arg = "",
-                               call = caller_env()) {
+vec_default_ptype2 <- function(
+  x,
+  y,
+  ...,
+  x_arg = "",
+  y_arg = "",
+  call = caller_env()
+) {
   if (is_asis(x)) {
     return(vec_ptype2_asis_left(
       x,
@@ -153,6 +161,16 @@ vec_default_ptype2 <- function(x,
     return(vec_ptype(x, x_arg = x_arg))
   }
 
+  if (opts$s3_fallback) {
+    # Undo common class fallback class for error messages
+    if (is_common_class_fallback(x)) {
+      x <- fallback_class_remove(x)
+    }
+    if (is_common_class_fallback(y)) {
+      y <- fallback_class_remove(y)
+    }
+  }
+
   # The from-dispatch parameter is set only when called from our S3
   # dispatch mechanism, when no method is found to dispatch to. It
   # indicates whether the error message should provide advice about
@@ -175,12 +193,14 @@ vec_default_ptype2 <- function(x,
 # This wrapper for `stop_incompatible_type()` matches error context
 # arguments. It is useful to pass ptype2 arguments through dots
 # without risking unknown arguments getting stored as condition fields.
-vec_incompatible_ptype2 <- function(x,
-                                    y,
-                                    ...,
-                                    x_arg = "",
-                                    y_arg = "",
-                                    call = caller_env()) {
+vec_incompatible_ptype2 <- function(
+  x,
+  y,
+  ...,
+  x_arg = "",
+  y_arg = "",
+  call = caller_env()
+) {
   stop_incompatible_type(
     x,
     y,
@@ -258,7 +278,7 @@ is_common_class_fallback <- function(x) {
   inherits(x, "vctrs:::common_class_fallback")
 }
 common_class_suffix <- function(x, y) {
- vec_common_suffix(fallback_class(x), fallback_class(y))
+  vec_common_suffix(fallback_class(x), fallback_class(y))
 }
 fallback_class <- function(x) {
   if (is_common_class_fallback(x)) {
@@ -267,10 +287,17 @@ fallback_class <- function(x) {
     class(x)
   }
 }
+fallback_class_remove <- function(x) {
+  class(x) <- attr(x, "fallback_class", exact = TRUE)
+  attr(x, "fallback_class") <- NULL
+  x
+}
 
-check_ptype2_dots_empty <- function(...,
-                                    `vctrs:::from_dispatch`,
-                                    `vctrs:::s3_fallback`) {
+check_ptype2_dots_empty <- function(
+  ...,
+  `vctrs:::from_dispatch`,
+  `vctrs:::s3_fallback`
+) {
   check_dots_empty0(...)
 }
 match_fallback_opts <- function(..., `vctrs:::s3_fallback` = NULL) {
@@ -285,32 +312,36 @@ match_from_dispatch <- function(..., `vctrs:::from_dispatch` = FALSE) {
 fallback_opts <- function(s3_fallback = NULL) {
   # Order is important for the C side
   list(
-    s3_fallback = s3_fallback %||% s3_fallback_default()
+    s3_fallback = s3_fallback %||% S3_FALLBACK_false
   )
 }
 
-full_fallback_opts <- function() {
+enabled_fallback_opts <- function() {
   fallback_opts(
     s3_fallback = S3_FALLBACK_true
   )
 }
 
-vec_ptype2_opts <- function(x,
-                            y,
-                            ...,
-                            opts,
-                            x_arg = "",
-                            y_arg = "",
-                            call = caller_env()) {
+vec_ptype2_opts <- function(
+  x,
+  y,
+  ...,
+  opts,
+  x_arg = "",
+  y_arg = "",
+  call = caller_env()
+) {
   .Call(ffi_ptype2_opts, x, y, opts, environment())
 }
-vec_ptype2_params <- function(x,
-                              y,
-                              ...,
-                              s3_fallback = NULL,
-                              x_arg = "",
-                              y_arg = "",
-                              call = caller_env()) {
+vec_ptype2_params <- function(
+  x,
+  y,
+  ...,
+  s3_fallback = NULL,
+  x_arg = "",
+  y_arg = "",
+  call = caller_env()
+) {
   opts <- fallback_opts(
     s3_fallback = s3_fallback
   )
@@ -324,12 +355,14 @@ vec_ptype2_params <- function(x,
   )
 }
 
-vec_ptype2_no_fallback <- function(x,
-                                   y,
-                                   ...,
-                                   x_arg = "",
-                                   y_arg = "",
-                                   call = caller_env()) {
+vec_ptype2_no_fallback <- function(
+  x,
+  y,
+  ...,
+  x_arg = "",
+  y_arg = "",
+  call = caller_env()
+) {
   opts <- fallback_opts(
     s3_fallback = S3_FALLBACK_false
   )
@@ -337,7 +370,7 @@ vec_ptype2_no_fallback <- function(x,
     x,
     y,
     ...,
-   ,
+    ,
     opts = opts,
     x_arg = x_arg,
     y_arg = y_arg,
@@ -345,7 +378,6 @@ vec_ptype2_no_fallback <- function(x,
   )
 }
 
-s3_fallback_default <- function() 0L
 S3_FALLBACK_false <- 0L
 S3_FALLBACK_true <- 1L
 
@@ -359,13 +391,15 @@ vec_typeof2_s3 <- function(x, y) {
 }
 
 # https://github.com/r-lib/vctrs/issues/571
-vec_is_coercible <- function(x,
-                             y,
-                             ...,
-                             opts = fallback_opts(),
-                             x_arg = "",
-                             y_arg = "",
-                             call = caller_env()) {
+vec_is_coercible <- function(
+  x,
+  y,
+  ...,
+  opts = fallback_opts(),
+  x_arg = "",
+  y_arg = "",
+  call = caller_env()
+) {
   check_dots_empty0(...)
 
   .Call(
@@ -381,7 +415,13 @@ vec_is_subtype <- function(x, super, ..., x_arg = "", super_arg = "") {
   tryCatch(
     vctrs_error_incompatible_type = function(...) FALSE,
     {
-      common <- vctrs::vec_ptype2(x, super, ..., x_arg = x_arg, y_arg = super_arg)
+      common <- vctrs::vec_ptype2(
+        x,
+        super,
+        ...,
+        x_arg = x_arg,
+        y_arg = super_arg
+      )
       vec_is(common, super)
     }
   )

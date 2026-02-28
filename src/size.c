@@ -5,29 +5,22 @@
 // [[ register() ]]
 r_obj* ffi_size(r_obj* x, r_obj* frame) {
   struct r_lazy call = { .x = frame, .env = r_null };
-  return r_len(vec_size_3(x, vec_args.x, call));
+  return r_len(vec_size_params(x, vec_args.x, call));
 }
 
 r_ssize vec_size(r_obj* x) {
-  return vec_size_3(x, vec_args.x, lazy_calls.vec_size);
+  return vec_size_params(x, vec_args.x, lazy_calls.vec_size);
 }
 
-r_ssize vec_size_3(r_obj* x,
-                   struct vctrs_arg* p_arg,
-                   struct r_lazy call) {
-  struct vec_error_opts err = {
-    .p_arg = p_arg,
-    .call = call
-  };
-  return vec_size_opts(x, &err);
-}
-
-static
-r_ssize vec_size_opts(r_obj* x, const struct vec_error_opts* opts) {
+r_ssize vec_size_params(
+  r_obj* x,
+  struct vctrs_arg* p_x_arg,
+  struct r_lazy call
+) {
   struct vctrs_proxy_info info = vec_proxy_info(x);
-  KEEP(info.shelter);
+  KEEP(info.inner);
 
-  r_obj* data = info.proxy;
+  r_obj* data = info.inner;
 
   r_ssize size;
   switch (info.type) {
@@ -49,8 +42,8 @@ r_ssize vec_size_opts(r_obj* x, const struct vec_error_opts* opts) {
     break;
 
   default:
-    stop_scalar_type(x, opts->p_arg, opts->call);
-}
+    stop_scalar_type(x, p_x_arg, call);
+  }
 
   FREE(1);
   return size;
@@ -73,84 +66,36 @@ r_ssize vec_raw_size(r_obj* x) {
 
 // [[ register() ]]
 r_obj* ffi_list_sizes(r_obj* x, r_obj* frame) {
-  struct vec_error_opts err = {
-    .p_arg = vec_args.x,
-    .call = { .x = frame, .env = r_null }
-  };
-  return list_sizes(x, &err);
+  struct r_lazy call = { .x = frame, .env = r_null };
+  return list_sizes(x, vec_args.x, call);
 }
 
-r_obj* list_sizes(r_obj* x, const struct vec_error_opts* opts) {
-  if (!obj_is_list(x)) {
-    r_abort_lazy_call(opts->call,
-                      "%s must be a list, not %s.",
-                      r_c_str_format_error_arg("x"),
-                      r_obj_type_friendly(x));
-  }
+r_obj* list_sizes(
+  r_obj* xs,
+  struct vctrs_arg* p_xs_arg,
+  struct r_lazy call
+) {
+  obj_check_list(xs, p_xs_arg, call);
 
-  r_ssize size = vec_size(x);
-  r_obj* const * v_x = r_list_cbegin(x);
+  r_ssize size = vec_size(xs);
+  r_obj* const * v_xs = r_list_cbegin(xs);
 
   r_obj* out = KEEP(r_alloc_integer(size));
   int* v_out = r_int_begin(out);
 
-  r_obj* names = vec_names(x);
+  r_obj* names = vec_names(xs);
   r_attrib_poke_names(out, names);
 
   r_ssize i = 0;
-  struct vctrs_arg* arg = new_subscript_arg_vec(opts->p_arg, x, &i);
-  KEEP(arg->shelter);
-
-  struct vec_error_opts local_opts = *opts;
-  local_opts.p_arg = arg;
+  struct vctrs_arg* p_x_arg = new_subscript_arg_vec(p_xs_arg, xs, &i);
+  KEEP(p_x_arg->shelter);
 
   for (; i < size; ++i) {
-    v_out[i] = vec_size_opts(v_x[i], &local_opts);
+    r_obj* x = v_xs[i];
+    v_out[i] = vec_size_params(x, p_x_arg, call);
   }
 
   FREE(2);
-  return out;
-}
-
-r_obj* ffi_list_all_size(r_obj* xs, r_obj* ffi_size, r_obj* frame) {
-  // This is an internal error
-  obj_check_list(xs, vec_args.x, (struct r_lazy) {.x = frame, .env = r_null });
-
-  r_ssize size = r_arg_as_ssize(ffi_size, "size");
-
-  return r_lgl(list_all_size(xs, size));
-}
-
-static
-bool list_all_size(r_obj* xs, r_ssize size) {
-  if (r_typeof(xs) != R_TYPE_list) {
-    r_stop_unexpected_type(r_typeof(xs));
-  }
-
-  r_ssize i = 0;
-
-  r_ssize xs_size = r_length(xs);
-  r_obj* xs_names = r_names(xs);
-  r_obj* const* v_xs = r_list_cbegin(xs);
-
-  struct vctrs_arg* p_x_arg = new_subscript_arg(vec_args.x, xs_names, xs_size, &i);
-  KEEP(p_x_arg->shelter);
-
-  bool out = true;
-
-  for (; i < xs_size; ++i) {
-    r_obj* x = v_xs[i];
-
-    // Scalar list elements throw an error internal to `list_all_size()`
-    r_ssize x_size = vec_size_3(x, p_x_arg, lazy_calls.list_all_size);
-
-    if (x_size != size) {
-      out = false;
-      break;
-    }
-  }
-
-  FREE(1);
   return out;
 }
 
@@ -202,10 +147,12 @@ SEXP vctrs_df_size(SEXP x) {
   return r_int(df_raw_size(x));
 }
 
-r_obj* vec_check_recycle(r_obj* x,
-                         r_ssize size,
-                         struct vctrs_arg* x_arg,
-                         struct r_lazy call) {
+r_obj* vec_recycle(
+  r_obj* x,
+  r_ssize size,
+  struct vctrs_arg* p_x_arg,
+  struct r_lazy call
+) {
   if (x == r_null) {
     return r_null;
   }
@@ -224,7 +171,7 @@ r_obj* vec_check_recycle(r_obj* x,
     return out;
   }
 
-  stop_recycle_incompatible_size(n_x, size, x_arg, call);
+  stop_recycle_incompatible_size(n_x, size, p_x_arg, call);
 }
 
 // [[ register() ]]
@@ -250,7 +197,7 @@ r_obj* ffi_recycle(r_obj* x,
 
   struct r_lazy call = { .x = syms_call, .env = frame };
 
-  return vec_check_recycle(x, size, &x_arg, call);
+  return vec_recycle(x, size, &x_arg, call);
 }
 
 r_obj* vec_recycle_fallback(r_obj* x,

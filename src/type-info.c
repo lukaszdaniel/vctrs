@@ -1,50 +1,41 @@
 #include "vctrs.h"
 #include "decl/type-info-decl.h"
 
-
-struct vctrs_type_info vec_type_info(r_obj* x) {
-  struct vctrs_type_info info = {
-    .type = vec_typeof(x)
-  };
-
-  switch (info.type) {
-  case VCTRS_TYPE_s3: info.proxy_method = vec_proxy_method(x); break;
-  default: info.proxy_method = r_null;
-  }
-  info.shelter = info.proxy_method;
-
-  return info;
-}
-
 struct vctrs_proxy_info vec_proxy_info(r_obj* x) {
   struct vctrs_proxy_info info;
-  info.shelter = KEEP(r_alloc_list(2));
 
-  info.proxy_method = r_is_object(x) ? vec_proxy_method(x) : r_null;
-  r_list_poke(info.shelter, 0, info.proxy_method);
+  // Avoid `KEEP(x_proxy_method)` if not required! This does help with
+  // performance, since this is called in such a tight loop.
+  //
+  // `vec_proxy_method()` itself may also return `r_null`
+  r_obj* x_proxy_method = r_is_object(x) ? vec_proxy_method(x) : r_null;
 
-  if (info.proxy_method == r_null) {
+  if (x_proxy_method == r_null) {
+    info.inner = x;
     info.type = vec_base_typeof(x, false);
-    info.proxy = x;
+    info.had_proxy_method = false;
   } else {
-    r_obj* proxy = KEEP(vec_proxy_invoke(x, info.proxy_method));
-    info.type = vec_base_typeof(proxy, true);
-    info.proxy = proxy;
-    FREE(1);
+    KEEP(x_proxy_method);
+    info.inner = KEEP(vec_proxy_invoke(x, x_proxy_method));
+    info.type = vec_base_typeof(info.inner, true);
+    info.had_proxy_method = true;
+    FREE(2);
   }
-  r_list_poke(info.shelter, 1, info.proxy);
 
-  FREE(1);
   return info;
 }
 
+// Type info of `x`
+//
+// Does not take the proxy, so can return `VCTRS_TYPE_s3`, unlike `vec_proxy_info()`.
+//
 // [[ register() ]]
 r_obj* ffi_type_info(r_obj* x) {
-  struct vctrs_type_info info = vec_type_info(x);
+  r_obj* out = KEEP(Rf_mkNamed(R_TYPE_list, (const char*[]) { "type", "had_proxy_method", "" }));
 
-  r_obj* out = KEEP(Rf_mkNamed(R_TYPE_list, (const char*[]) { "type", "proxy_method", "" }));
-  r_list_poke(out, 0, r_chr(vec_type_as_str(info.type)));
-  r_list_poke(out, 1, info.proxy_method);
+  const enum vctrs_type type = vec_typeof(x);
+  r_list_poke(out, 0, r_chr(vec_type_as_str(type)));
+  r_list_poke(out, 1, r_lgl(vec_proxy_method(x) != r_null));
 
   FREE(1);
   return out;
@@ -52,13 +43,14 @@ r_obj* ffi_type_info(r_obj* x) {
 // [[ register() ]]
 r_obj* ffi_proxy_info(r_obj* x) {
   struct vctrs_proxy_info info = vec_proxy_info(x);
+  KEEP(info.inner);
 
-  r_obj* out = KEEP(Rf_mkNamed(R_TYPE_list, (const char*[]) { "type", "proxy_method", "proxy", "" }));
+  r_obj* out = KEEP(Rf_mkNamed(R_TYPE_list, (const char*[]) { "type", "had_proxy_method", "proxy", "" }));
   r_list_poke(out, 0, r_chr(vec_type_as_str(info.type)));
-  r_list_poke(out, 1, info.proxy_method);
-  r_list_poke(out, 2, info.proxy);
+  r_list_poke(out, 1, r_lgl(info.had_proxy_method));
+  r_list_poke(out, 2, info.inner);
 
-  FREE(1);
+  FREE(2);
   return out;
 }
 
@@ -87,70 +79,6 @@ enum vctrs_type vec_base_typeof(r_obj* x, bool proxied) {
 enum vctrs_type vec_proxy_typeof(r_obj* x) {
   return vec_base_typeof(x, true);
 }
-
-
-// [[ register() ]]
-r_obj* ffi_obj_is_list(r_obj* x) {
-  return r_lgl(obj_is_list(x));
-}
-
-bool obj_is_list(r_obj* x) {
-  // Require `x` to be a list internally
-  if (r_typeof(x) != R_TYPE_list) {
-    return false;
-  }
-
-  // Unclassed R_TYPE_list are lists
-  if (!r_is_object(x)) {
-    return true;
-  }
-
-  const enum vctrs_class_type type = class_type(x);
-
-  // Classed R_TYPE_list are only lists if the last class is explicitly `"list"`
-  // or if it is a bare "AsIs" type
-  return (type == VCTRS_CLASS_list) || (type == VCTRS_CLASS_bare_asis);
-}
-
-r_obj* ffi_obj_is_vector(r_obj* x) {
-  return r_lgl(obj_is_vector(x));
-}
-
-bool obj_is_vector(r_obj* x) {
-  if (x == r_null) {
-    return false;
-  }
-
-  struct vctrs_proxy_info info = vec_proxy_info(x);
-  return info.type != VCTRS_TYPE_scalar;
-}
-
-// [[ register() ]]
-r_obj* ffi_list_all_vectors(r_obj* x, r_obj* frame) {
-  obj_check_list(x, vec_args.x, (struct r_lazy) { frame, r_null });
-  return r_lgl(list_all_vectors(x));
-}
-
-bool list_all_vectors(r_obj* x) {
-  if (r_typeof(x) != R_TYPE_list) {
-    r_stop_unexpected_type(r_typeof(x));
-  }
-
-  // TODO: Use `r_list_all_of(x, &obj_is_vector)` when we add it back in
-  const r_ssize size = r_length(x);
-  r_obj* const* v_x = r_list_cbegin(x);
-
-  for (r_ssize i = 0; i < size; ++i) {
-    r_obj* elt = v_x[i];
-
-    if (!obj_is_vector(elt)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
 
 // [[ register() ]]
 r_obj* vctrs_typeof(r_obj* x, r_obj* dispatch) {

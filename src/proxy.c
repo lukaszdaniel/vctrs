@@ -4,26 +4,19 @@
 
 
 r_obj* vec_proxy(r_obj* x) {
-  return vec_proxy_2(x, VCTRS_RECURSE_false);
+  return vec_proxy_2(x, false);
 }
 r_obj* vec_proxy_recurse(r_obj* x) {
-  return vec_proxy_2(x, VCTRS_RECURSE_true);
+  return vec_proxy_2(x, true);
 }
 
-static
-r_obj* vec_proxy_2(r_obj* x, enum vctrs_recurse recurse) {
-  struct vctrs_type_info info = vec_type_info(x);
-  KEEP(info.shelter);
-
-  switch (info.type) {
-  case VCTRS_TYPE_dataframe: {
-    r_obj* out = recurse ? df_proxy_recurse(x) : x;
-    FREE(1);
-    return out;
-  }
+static inline
+r_obj* vec_proxy_2(r_obj* x, bool recurse) {
+  switch (vec_typeof(x)) {
 
   case VCTRS_TYPE_s3: {
-    r_obj* out = KEEP(vec_proxy_invoke(x, info.proxy_method));
+    r_obj* x_proxy_method = KEEP(vec_proxy_method(x));
+    r_obj* out = KEEP(vec_proxy_invoke(x, x_proxy_method));
     if (recurse && is_data_frame(out)) {
       out = df_proxy_recurse(out);
     }
@@ -31,8 +24,11 @@ r_obj* vec_proxy_2(r_obj* x, enum vctrs_recurse recurse) {
     return out;
   }
 
+  // Avoid `KEEP()` in the most common paths (data frames and unclassed atomics)
+  case VCTRS_TYPE_dataframe: {
+    return recurse ? df_proxy_recurse(x) : x;
+  }
   default:
-    FREE(1);
     return x;
   }
 }
@@ -251,10 +247,8 @@ r_obj* vec_proxy_unwrap(r_obj* x) {
 }
 
 
-r_obj* ffi_unset_s4(r_obj* x) {
-  x = r_clone_referenced(x);
-  r_unmark_s4(x);
-  return x;
+r_obj* ffi_as_not_s4(r_obj* x) {
+  return r_as_not_s4(x);
 }
 
 

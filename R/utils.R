@@ -10,6 +10,9 @@ indent <- function(x, n) {
 ones <- function(...) {
   array(1, dim = c(...))
 }
+ones_list <- function(...) {
+  array(list(1), dim = c(...))
+}
 
 vec_coerce_bare <- function(x, type) {
   # FIXME! Unexported wrapper around Rf_coerceVector()
@@ -72,7 +75,7 @@ compact <- function(x) {
   x[!is_null]
 }
 
-paste_line <- function (...) {
+paste_line <- function(...) {
   paste(chr(...), collapse = "\n")
 }
 
@@ -178,10 +181,7 @@ s3_get_method <- function(class, generic, ns = "base") {
   .Call(ffi_s3_get_method, generic, class, table)
 }
 
-s3_method_specific <- function(x,
-                               generic,
-                               ns = "base",
-                               default = TRUE) {
+s3_method_specific <- function(x, generic, ns = "base", default = TRUE) {
   classes <- class(x)[[1]]
 
   if (default) {
@@ -252,7 +252,13 @@ fast_c <- function(x, y) {
 
 # Based on r-lib/bench (itself based on gaborcsardi/prettyunits)
 #' @export
-format.vctrs_bytes <- function(x, scientific = FALSE, digits = 3, drop0trailing = TRUE, ...) {
+format.vctrs_bytes <- function(
+  x,
+  scientific = FALSE,
+  digits = 3,
+  drop0trailing = TRUE,
+  ...
+) {
   nms <- names(x)
 
   bytes <- unclass(x)
@@ -267,13 +273,19 @@ format.vctrs_bytes <- function(x, scientific = FALSE, digits = 3, drop0trailing 
   ## NA and NaN bytes
   res[is.na(bytes)] <- NA_real_
   res[is.nan(bytes)] <- NaN
-  unit[is.na(bytes)] <- ""            # Includes NaN as well
+  unit[is.na(bytes)] <- "" # Includes NaN as well
 
   # Append an extra B to each unit
   large_units <- unit %in% names(byte_units)[-1]
   unit[large_units] <- paste0(unit[large_units], "B")
 
-  res <- format(res, scientific = scientific, digits = digits, drop0trailing = drop0trailing, ...)
+  res <- format(
+    res,
+    scientific = scientific,
+    digits = digits,
+    drop0trailing = drop0trailing,
+    ...
+  )
 
   stats::setNames(paste0(res, unit), nms)
 }
@@ -294,13 +306,13 @@ find_unit <- function(x, units) {
 byte_units <- c(
   'B' = 1,
   'K' = 1024,
-  'M' = 1024 ^ 2,
-  'G' = 1024 ^ 3,
-  'T' = 1024 ^ 4,
-  'P' = 1024 ^ 5,
-  'E' = 1024 ^ 6,
-  'Z' = 1024 ^ 7,
-  'Y' = 1024 ^ 8
+  'M' = 1024^2,
+  'G' = 1024^3,
+  'T' = 1024^4,
+  'P' = 1024^5,
+  'E' = 1024^6,
+  'Z' = 1024^7,
+  'Y' = 1024^8
 )
 
 new_vctrs_bytes <- function(x) {
@@ -314,9 +326,7 @@ named <- function(x) {
   x
 }
 
-browser <- function(...,
-                    skipCalls = 0,
-                    frame = parent.frame()) {
+browser <- function(..., skipCalls = 0, frame = parent.frame()) {
   if (!identical(stdout(), getConnection(1))) {
     sink(getConnection(1))
     withr::defer(sink(), envir = frame)
@@ -332,4 +342,12 @@ browser <- function(...,
 vec_paste0 <- function(...) {
   args <- vec_recycle_common(...)
   exec(paste0, !!!args)
+}
+
+# On R <3.6.0, we used to have a special C version of this to avoid two copies
+# from being made by `attributes(x) <- attrib`. Now that we require R >=4.0.0,
+# we don't have the C utility anymore.
+vec_set_attributes <- function(x, attrib) {
+  attributes(x) <- attrib
+  x
 }

@@ -1,4 +1,3 @@
-
 # Vectorised --------------------------------------------------------------
 
 test_that("vec_hash() produces same hash for same values", {
@@ -30,13 +29,17 @@ test_that("same string hashes to same value", {
 })
 
 test_that("list hashes to values of individual values", {
-  x <- vec_hash(list(1:3, letters))
+  cpl <- complex(real = c(1, 2), imaginary = c(3, 4))
+
+  x <- vec_hash(list(1:3, letters, cpl))
   expect_identical(x[1:4], obj_hash(1:3))
   expect_identical(x[5:8], obj_hash(letters))
+  expect_identical(x[9:12], obj_hash(cpl))
 
-  x <- map(list(list(1:3), list(letters)), vec_hash)
+  x <- map(list(list(1:3), list(letters), list(cpl)), vec_hash)
   expect_identical(x[[1]], obj_hash(1:3))
   expect_identical(x[[2]], obj_hash(letters))
+  expect_identical(x[[3]], obj_hash(cpl))
 })
 
 test_that("hash of data frame works down rows", {
@@ -124,13 +127,24 @@ test_that("can hash 1D arrays", {
 })
 
 test_that("can hash raw vectors", {
-  expect_identical(vec_hash(0:255), vec_hash(as.raw(0:255)))
+  expect_identical(
+    vec_hash(0:255),
+    vec_hash(as.raw(0:255))
+  )
+  expect_identical(
+    obj_hash(0:255),
+    obj_hash(as.raw(0:255))
+  )
 })
 
 test_that("can hash complex vectors", {
   expect_identical(
     vec_hash(c(1, 2) + 0i),
     c(obj_hash(c(1, 0)), obj_hash(c(2, 0)))
+  )
+  expect_identical(
+    vec_hash(list(c(1, 2) + 0i)),
+    obj_hash(c(1, 2) + 0i)
   )
 })
 
@@ -163,12 +177,18 @@ test_that("equal objects hash to same value", {
   f1 <- function(x, y = NULL) x + y
   f2 <- function(x, y = NULL) x + y
   expect_false(identical(obj_hash(f1), obj_hash(f2)))
-  expect_false(identical(vec_hash(data_frame(x = list(f1))), vec_hash(data_frame(x = list(f2)))))
+  expect_false(identical(
+    vec_hash(data_frame(x = list(f1))),
+    vec_hash(data_frame(x = list(f2)))
+  ))
 
   attr(f1, "srcref") <- NULL
   attr(f2, "srcref") <- NULL
   expect_equal(obj_hash(f1), obj_hash(f2))
-  expect_equal(vec_hash(data_frame(x = list(f1))), vec_hash(data_frame(x = list(f2))))
+  expect_equal(
+    vec_hash(data_frame(x = list(f1))),
+    vec_hash(data_frame(x = list(f2)))
+  )
 })
 
 test_that("expression vectors hash to the same value as lists of calls/names", {

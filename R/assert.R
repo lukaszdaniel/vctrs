@@ -57,11 +57,13 @@
 #'   invisibly.
 #' @keywords internal
 #' @export
-vec_assert <- function(x,
-                       ptype = NULL,
-                       size = NULL,
-                       arg = caller_arg(x),
-                       call = caller_env()) {
+vec_assert <- function(
+  x,
+  ptype = NULL,
+  size = NULL,
+  arg = caller_arg(x),
+  call = caller_env()
+) {
   if (!obj_is_vector(x)) {
     stop_scalar_type(x, arg, call = call)
   }
@@ -104,16 +106,8 @@ vec_assert <- function(x,
 }
 
 # Also thrown from C
-stop_assert_size <- function(actual,
-                             required,
-                             arg,
-                             call = caller_env()) {
-  if (!nzchar(arg)) {
-    arg <- "Input"
-  } else {
-    arg <- glue::backtick(arg)
-  }
-
+stop_assert_size <- function(actual, required, arg, call = caller_env()) {
+  arg <- arg_backtick(arg)
   message <- glue::glue("{arg} must have size {required}, not size {actual}.")
 
   stop_assert(
@@ -125,10 +119,12 @@ stop_assert_size <- function(actual,
   )
 }
 
-stop_assert <- function(message = NULL,
-                        class = NULL,
-                        ...,
-                        call = caller_env()) {
+stop_assert <- function(
+  message = NULL,
+  class = NULL,
+  ...,
+  call = caller_env()
+) {
   stop_vctrs(
     message,
     class = c(class, "vctrs_error_assert"),
@@ -176,13 +172,16 @@ vec_is <- function(x, ptype = NULL, size = NULL) {
 #' - `vec_check_size()` tests if `x` has size `size`, and throws an informative
 #'   error if it doesn't.
 #'
+#' - `vec_check_recyclable()` tests if `x` can recycle to size `size`, and
+#'   throws an informative error if it can't.
+#'
 #' @inheritParams rlang::args_dots_empty
 #' @inheritParams rlang::args_error_context
 #'
 #' @param x For `obj_*()` functions, an object. For `vec_*()` functions, a
 #'   vector.
 #'
-#' @param size The size to check for.
+#' @param size The size to check for compatibility with.
 #'
 #' @returns
 #' - `obj_is_vector()` returns a single `TRUE` or `FALSE`.
@@ -190,6 +189,8 @@ vec_is <- function(x, ptype = NULL, size = NULL) {
 #' - `obj_check_vector()` returns `NULL` invisibly, or errors.
 #'
 #' - `vec_check_size()` returns `NULL` invisibly, or errors.
+#'
+#' - `vec_check_recyclable()` returns `NULL` invisibly, or errors.
 #'
 #' @section Vectors and scalars:
 #'
@@ -263,6 +264,12 @@ vec_is <- function(x, ptype = NULL, size = NULL) {
 #' # input doesn't match `size`
 #' vec_check_size(1:5, size = 5)
 #' try(vec_check_size(1:5, size = 4))
+#'
+#' # `vec_check_recyclable()` throws an informative error if the input can't
+#' # recycle to size `size`
+#' vec_check_recyclable(1:5, size = 5)
+#' vec_check_recyclable(1, size = 5)
+#' try(vec_check_recyclable(1:2, size = 5))
 NULL
 
 #' @export
@@ -273,32 +280,46 @@ obj_is_vector <- function(x) {
 
 #' @export
 #' @rdname vector-checks
-obj_check_vector <- function(x,
-                             ...,
-                             arg = caller_arg(x),
-                             call = caller_env()) {
+obj_check_vector <- function(x, ..., arg = caller_arg(x), call = caller_env()) {
   check_dots_empty0(...)
   invisible(.Call(ffi_obj_check_vector, x, environment()))
 }
 
 #' @export
 #' @rdname vector-checks
-vec_check_size <- function(x,
-                           size,
-                           ...,
-                           arg = caller_arg(x),
-                           call = caller_env()) {
+vec_check_size <- function(
+  x,
+  size,
+  ...,
+  arg = caller_arg(x),
+  call = caller_env()
+) {
   check_dots_empty0(...)
   invisible(.Call(ffi_vec_check_size, x, size, environment()))
+}
+
+#' @export
+#' @rdname vector-checks
+vec_check_recyclable <- function(
+  x,
+  size,
+  ...,
+  arg = caller_arg(x),
+  call = caller_env()
+) {
+  check_dots_empty0(...)
+  invisible(.Call(ffi_vec_check_recyclable, x, size, environment()))
 }
 
 #' List checks
 #'
 #' @description
 #' - `obj_is_list()` tests if `x` is considered a list in the vctrs sense. It
-#'   returns `TRUE` if:
-#'   - `x` is a bare list with no class.
-#'   - `x` is a list explicitly inheriting from `"list"`.
+#'   returns `TRUE` if all of the following hold:
+#'   - `x` must have list storage, i.e. `typeof(x)` returns `"list"`
+#'   - `x` must not have a `dim` attribute
+#'   - `x` must not have a `class` attribute, or must explicitly inherit from
+#'     `"list"` as the last class
 #'
 #' - `list_all_vectors()` takes a list and returns `TRUE` if all elements of
 #'   that list are vectors.
@@ -306,9 +327,12 @@ vec_check_size <- function(x,
 #' - `list_all_size()` takes a list and returns `TRUE` if all elements of that
 #'   list have the same `size`.
 #'
-#' - `obj_check_list()`, `list_check_all_vectors()`, and `list_check_all_size()`
-#'   use the above functions, but throw a standardized and informative error if
-#'   they return `FALSE`.
+#' - `list_all_recyclable()` takes a list and returns `TRUE` if all elements of
+#'   that list can recycle to `size`.
+#'
+#' - `obj_check_list()`, `list_check_all_vectors()`, `list_check_all_size()`,
+#'   and `list_check_all_recyclable()` use the above functions, but throw a
+#'   standardized and informative error if they return `FALSE`.
 #'
 #' @inheritParams rlang::args_error_context
 #' @inheritParams rlang::args_dots_empty
@@ -316,7 +340,10 @@ vec_check_size <- function(x,
 #' @param x For `vec_*()` functions, an object. For `list_*()` functions, a
 #'   list.
 #'
-#' @param size The size to check each element for.
+#' @param size The size to check each element for compatibility with.
+#'
+#' @param allow_null Whether `NULL` elements should be skipped over
+#'   automatically or not.
 #'
 #' @details
 #' Notably, data frames and S3 record style classes like POSIXlt are not
@@ -335,61 +362,115 @@ vec_check_size <- function(x,
 #' list_all_size(list(1:2, 2:3), 2)
 #' list_all_size(list(1:2, 2:4), 2)
 #'
+#' list_all_recyclable(list(1, 2:3), 2)
+#' list_all_recyclable(list(1, 2:4), 2)
+#'
 #' # `list_`-prefixed functions assume a list:
 #' try(list_all_vectors(environment()))
+#'
+#' # `NULL` elements are not considered vectors and generally have a size of 0
+#' try(list_check_all_vectors(list(1, NULL, 2)))
+#' try(list_check_all_size(list(1, NULL, 2), size = 1))
+#'
+#' # However, it is often useful to perform upfront vector/size checks on a
+#' # list, excluding `NULL`s, and then filter them out later on
+#' list_check_all_vectors(list(1, NULL, 2), allow_null = TRUE)
+#' list_check_all_size(list(1, NULL, 2), size = 1, allow_null = TRUE)
+#'
+#' # Performing the checks before removing `NULL`s from the list ensures that
+#' # any errors report the correct index. Note how the index is incorrect from a
+#' # user's point of view if we filter out `NULL` too soon.
+#' xs <- list(1, NULL, 2:3)
+#' try(list_check_all_size(xs, size = 1, allow_null = TRUE))
+#' xs <- vec_slice(xs, !vec_detect_missing(xs))
+#' try(list_check_all_size(xs, size = 1))
 obj_is_list <- function(x) {
   .Call(ffi_obj_is_list, x)
 }
 #' @rdname obj_is_list
 #' @export
-obj_check_list <- function(x,
-                           ...,
-                           arg = caller_arg(x),
-                           call = caller_env()) {
+obj_check_list <- function(x, ..., arg = caller_arg(x), call = caller_env()) {
   check_dots_empty0(...)
   invisible(.Call(ffi_check_list, x, environment()))
 }
 
 #' @rdname obj_is_list
 #' @export
-list_all_vectors <- function(x) {
-  .Call(ffi_list_all_vectors, x, environment())
-}
-
-#' @rdname obj_is_list
-#' @export
-list_check_all_vectors <- function(x,
-                                   ...,
-                                   arg = caller_arg(x),
-                                   call = caller_env()) {
+list_all_vectors <- function(x, ..., allow_null = FALSE) {
   check_dots_empty0(...)
-  invisible(.Call(ffi_list_check_all_vectors, x, environment()))
+  .Call(ffi_list_all_vectors, x, allow_null, environment())
 }
 
 #' @rdname obj_is_list
 #' @export
-list_all_size <- function(x, size) {
-  .Call(ffi_list_all_size, x, size, environment())
-}
-
-#' @rdname obj_is_list
-#' @export
-list_check_all_size <- function(x,
-                                size,
-                                ...,
-                                arg = caller_arg(x),
-                                call = caller_env()) {
+list_check_all_vectors <- function(
+  x,
+  ...,
+  allow_null = FALSE,
+  arg = caller_arg(x),
+  call = caller_env()
+) {
   check_dots_empty0(...)
-  invisible(.Call(ffi_list_check_all_size, x, size, environment()))
+  invisible(.Call(ffi_list_check_all_vectors, x, allow_null, environment()))
+}
+
+#' @rdname obj_is_list
+#' @export
+list_all_size <- function(x, size, ..., allow_null = FALSE) {
+  check_dots_empty0(...)
+  .Call(ffi_list_all_size, x, size, allow_null, environment())
+}
+
+#' @rdname obj_is_list
+#' @export
+list_check_all_size <- function(
+  x,
+  size,
+  ...,
+  allow_null = FALSE,
+  arg = caller_arg(x),
+  call = caller_env()
+) {
+  check_dots_empty0(...)
+  invisible(.Call(
+    ffi_list_check_all_size,
+    x,
+    size,
+    allow_null,
+    environment()
+  ))
+}
+
+#' @rdname obj_is_list
+#' @export
+list_all_recyclable <- function(x, size, ..., allow_null = FALSE) {
+  check_dots_empty0(...)
+  .Call(ffi_list_all_recyclable, x, size, allow_null, environment())
+}
+
+#' @rdname obj_is_list
+#' @export
+list_check_all_recyclable <- function(
+  x,
+  size,
+  ...,
+  allow_null = FALSE,
+  arg = caller_arg(x),
+  call = caller_env()
+) {
+  check_dots_empty0(...)
+  invisible(.Call(
+    ffi_list_check_all_recyclable,
+    x,
+    size,
+    allow_null,
+    environment()
+  ))
 }
 
 # Called from C
 stop_non_list_type <- function(x, arg, call) {
-  if (nzchar(arg)) {
-    arg <- cli::format_inline("{.arg {arg}}")
-  } else {
-    arg <- "Input"
-  }
+  arg <- arg_backtick(arg)
 
   cli::cli_abort(
     "{arg} must be a list, not {obj_type_friendly(x)}.",
@@ -398,14 +479,6 @@ stop_non_list_type <- function(x, arg, call) {
 }
 
 is_same_type <- function(x, ptype) {
-  if (is_partial(ptype)) {
-    env <- environment()
-    ptype <- tryCatch(
-      vctrs_error_incompatible_type = function(...) return_from(env, FALSE),
-      vec_ptype_common(x, ptype)
-    )
-  }
-
   x <- vec_slice(x, integer())
   ptype <- vec_slice(ptype, integer())
 

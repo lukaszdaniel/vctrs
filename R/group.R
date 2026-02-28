@@ -1,9 +1,6 @@
 #' Identify groups
 #'
 #' @description
-#'
-#' `r lifecycle::badge("experimental")`
-#'
 #' * `vec_group_id()` returns an identifier for the group that each element of
 #'   `x` falls in, constructed in the order that they appear. The number of
 #'   groups is also returned as an attribute, `n`.
@@ -106,5 +103,9 @@ new_group_rle <- function(group, length, n) {
     abort("`group` and `length` must have the same size.")
   }
 
-  new_rcrd(list(group = group, length = length), n = n, class = "vctrs_group_rle")
+  new_rcrd(
+    list(group = group, length = length),
+    n = n,
+    class = "vctrs_group_rle"
+  )
 }

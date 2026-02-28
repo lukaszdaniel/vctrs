@@ -35,7 +35,10 @@ new_datetime <- function(x = double(), tzone = "") {
 
 #' @export
 #' @rdname new_date
-new_duration <- function(x = double(), units = c("secs", "mins", "hours", "days", "weeks")) {
+new_duration <- function(
+  x = double(),
+  units = c("secs", "mins", "hours", "days", "weeks")
+) {
   stopifnot(is.double(x))
   units <- arg_match0(units, c("secs", "mins", "hours", "days", "weeks"))
 
@@ -130,6 +133,22 @@ vec_ptype_abbr.difftime <- function(x, ...) {
   "drtn"
 }
 
+# Ptype -------------------------------------------------------------------
+
+#' @export
+vec_ptype.POSIXlt <- function(x, ...) {
+  # `vec_ptype2()` pushes towards `POSIXct`. In theory, maybe `vec_ptype()`
+  # should as well so that `vec_c(<POSIXlt>)` and `vec_c(<POSIXlt>, <POSIXlt>)`
+  # are consistent and both return `POSIXct`. In practice this broke a number of
+  # packages (datetimeoffset, slider, nanoarrow), and also generally means that
+  # you wouldn't be able to provide a `POSIXlt` as a `ptype` argument to
+  # anything and expect it to return a `POSIXlt` as output. So we've decided to
+  # just leave this inconsistency. Getting `POSIXlt` attributes exactly right
+  # is very tricky, and very R version dependent, so we just consistency align
+  # with `[` here and in tests.
+  x[0]
+}
+
 # Coerce ------------------------------------------------------------------
 
 #' @rdname new_date
@@ -208,7 +227,9 @@ vec_ptype2.POSIXlt.POSIXct <- function(x, y, ...) {
 vec_ptype2.difftime <- function(x, y, ...) UseMethod("vec_ptype2.difftime")
 #' @method vec_ptype2.difftime difftime
 #' @export
-vec_ptype2.difftime.difftime <- function(x, y, ...) new_duration(units = units_union(x, y))
+vec_ptype2.difftime.difftime <- function(x, y, ...) {
+  new_duration(units = units_union(x, y))
+}
 
 # Cast --------------------------------------------------------------------
 
@@ -347,18 +368,25 @@ vec_arith.difftime <- function(op, x, y, ...) UseMethod("vec_arith.difftime", y)
 vec_arith.Date.default <- function(op, x, y, ...) stop_incompatible_op(op, x, y)
 #' @method vec_arith.POSIXct default
 #' @export
-vec_arith.POSIXct.default <- function(op, x, y, ...) stop_incompatible_op(op, x, y)
+vec_arith.POSIXct.default <- function(op, x, y, ...) {
+  stop_incompatible_op(op, x, y)
+}
 #' @method vec_arith.POSIXlt default
 #' @export
-vec_arith.POSIXlt.default <- function(op, x, y, ...) stop_incompatible_op(op, x, y)
+vec_arith.POSIXlt.default <- function(op, x, y, ...) {
+  stop_incompatible_op(op, x, y)
+}
 #' @method vec_arith.difftime default
 #' @export
-vec_arith.difftime.default <- function(op, x, y, ...) stop_incompatible_op(op, x, y)
+vec_arith.difftime.default <- function(op, x, y, ...) {
+  stop_incompatible_op(op, x, y)
+}
 
 #' @method vec_arith.Date Date
 #' @export
 vec_arith.Date.Date <- function(op, x, y, ...) {
-  switch(op,
+  switch(
+    op,
     `-` = difftime(x, y, units = "days"),
     stop_incompatible_op(op, x, y)
   )
@@ -366,7 +394,8 @@ vec_arith.Date.Date <- function(op, x, y, ...) {
 #' @method vec_arith.POSIXct POSIXct
 #' @export
 vec_arith.POSIXct.POSIXct <- function(op, x, y, ...) {
-  switch(op,
+  switch(
+    op,
     `-` = difftime(x, y, units = "secs"),
     stop_incompatible_op(op, x, y)
   )
@@ -396,7 +425,8 @@ vec_arith.POSIXct.POSIXlt <- vec_arith.POSIXct.POSIXct
 #' @method vec_arith.Date numeric
 #' @export
 vec_arith.Date.numeric <- function(op, x, y, ...) {
-  switch(op,
+  switch(
+    op,
     `+` = vec_restore(vec_arith_base(op, x, y), x),
     `-` = vec_restore(vec_arith_base(op, x, y), x),
     stop_incompatible_op(op, x, y)
@@ -405,7 +435,8 @@ vec_arith.Date.numeric <- function(op, x, y, ...) {
 #' @method vec_arith.numeric Date
 #' @export
 vec_arith.numeric.Date <- function(op, x, y, ...) {
-  switch(op,
+  switch(
+    op,
     `+` = vec_restore(vec_arith_base(op, x, y), y),
     stop_incompatible_op(op, x, y)
   )
@@ -432,7 +463,8 @@ vec_arith.numeric.POSIXlt <- function(op, x, y, ...) {
 vec_arith.Date.difftime <- function(op, x, y, ...) {
   y <- vec_cast(y, new_duration(units = "days"))
 
-  switch(op,
+  switch(
+    op,
     `+` = ,
     `-` = vec_restore(vec_arith_base(op, x, lossy_floor(y, x)), x),
     stop_incompatible_op(op, x, y)
@@ -443,7 +475,8 @@ vec_arith.Date.difftime <- function(op, x, y, ...) {
 vec_arith.difftime.Date <- function(op, x, y, ...) {
   x <- vec_cast(x, new_duration(units = "days"))
 
-  switch(op,
+  switch(
+    op,
     `+` = vec_restore(vec_arith_base(op, lossy_floor(x, y), y), y),
     stop_incompatible_op(op, x, y)
   )
@@ -453,7 +486,8 @@ vec_arith.difftime.Date <- function(op, x, y, ...) {
 vec_arith.POSIXct.difftime <- function(op, x, y, ...) {
   y <- vec_cast(y, new_duration(units = "secs"))
 
-  switch(op,
+  switch(
+    op,
     `+` = vec_restore(vec_arith_base(op, x, y), x),
     `-` = vec_restore(vec_arith_base(op, x, y), x),
     stop_incompatible_op(op, x, y)
@@ -464,7 +498,8 @@ vec_arith.POSIXct.difftime <- function(op, x, y, ...) {
 vec_arith.difftime.POSIXct <- function(op, x, y, ...) {
   x <- vec_cast(x, new_duration(units = "secs"))
 
-  switch(op,
+  switch(
+    op,
     `+` = vec_restore(vec_arith_base(op, x, y), y),
     stop_incompatible_op(op, x, y)
   )
@@ -488,12 +523,13 @@ vec_arith.difftime.difftime <- function(op, x, y, ...) {
   x <- args[[1L]]
   y <- args[[2L]]
 
-  switch(op,
-    `+`   = vec_restore(vec_arith_base(op, x, y), x),
-    `-`   = vec_restore(vec_arith_base(op, x, y), x),
-    `/`   = vec_arith_base(op, x, y),
+  switch(
+    op,
+    `+` = vec_restore(vec_arith_base(op, x, y), x),
+    `-` = vec_restore(vec_arith_base(op, x, y), x),
+    `/` = vec_arith_base(op, x, y),
     `%/%` = vec_arith_base(op, x, y),
-    `%%`  = vec_arith_base(op, x, y),
+    `%%` = vec_arith_base(op, x, y),
     stop_incompatible_op(op, x, y)
   )
 }
@@ -501,7 +537,8 @@ vec_arith.difftime.difftime <- function(op, x, y, ...) {
 #' @method vec_arith.difftime MISSING
 #' @export
 vec_arith.difftime.MISSING <- function(op, x, y, ...) {
-  switch(op,
+  switch(
+    op,
     `-` = vec_restore(-vec_data(x), x),
     `+` = x,
     stop_incompatible_op(op, x, y)
@@ -516,7 +553,8 @@ vec_arith.difftime.numeric <- function(op, x, y, ...) {
 #' @method vec_arith.numeric difftime
 #' @export
 vec_arith.numeric.difftime <- function(op, x, y, ...) {
-  switch(op,
+  switch(
+    op,
     `/` = stop_incompatible_op(op, x, y),
     vec_restore(vec_arith_base(op, x, y), y)
   )

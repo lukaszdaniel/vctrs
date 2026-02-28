@@ -3,8 +3,17 @@ test_that("vec_recycle_common() reports error context", {
   expect_snapshot({
     (expect_error(my_function(this_arg = 1:2, that_arg = int())))
     (expect_error(my_function(this_arg = 1:2, that_arg = int(), .size = 2)))
-    (expect_error(my_function(this_arg = 1:2, that_arg = int(), .arg = "my_arg")))
-    (expect_error(my_function(this_arg = 1:2, that_arg = int(), .size = 2, .arg = "my_arg")))
+    (expect_error(my_function(
+      this_arg = 1:2,
+      that_arg = int(),
+      .arg = "my_arg"
+    )))
+    (expect_error(my_function(
+      this_arg = 1:2,
+      that_arg = int(),
+      .size = 2,
+      .arg = "my_arg"
+    )))
   })
 })
 
@@ -25,10 +34,19 @@ test_that("vec_recycle(): incompatible lengths get error messages", {
   x2 <- c(1, 2)
 
   expect_snapshot({
-    (expect_error(vec_recycle(x2, 1), class = "vctrs_error_recycle_incompatible_size"))
+    (expect_error(
+      vec_recycle(x2, 1),
+      class = "vctrs_error_recycle_incompatible_size"
+    ))
   })
-  expect_error(vec_recycle(x2, 0), class = "vctrs_error_recycle_incompatible_size")
-  expect_error(vec_recycle(x2, 3), class = "vctrs_error_recycle_incompatible_size")
+  expect_error(
+    vec_recycle(x2, 0),
+    class = "vctrs_error_recycle_incompatible_size"
+  )
+  expect_error(
+    vec_recycle(x2, 3),
+    class = "vctrs_error_recycle_incompatible_size"
+  )
 })
 
 test_that("can recycle arrays", {
@@ -53,6 +71,20 @@ test_that("can recycle arrays", {
 
 test_that("vec_recycle() evaluates x_arg lazily", {
   expect_silent(vec_recycle(1L, 1L, x_arg = print("oof")))
+})
+
+test_that("recycling to size 1 has informative error", {
+  expect_snapshot({
+    (expect_error(
+      vec_recycle(1:2, 1),
+      class = "vctrs_error_recycle_incompatible_size"
+    ))
+  })
+})
+
+test_that("incompatible recycling size has informative error", {
+  expect_snapshot(error = TRUE, vec_recycle(1:2, 4))
+  expect_snapshot(error = TRUE, vec_recycle(1:2, 4, x_arg = "foo"))
 })
 
 # Empty -------------------------------------------------------------------
@@ -89,10 +121,48 @@ test_that("vec_recycle_common recycles size 1 to any other size", {
 
 test_that("vec_recycle_common(): incompatible lengths get error messages", {
   expect_snapshot({
-    (expect_error(vec_recycle_common(1:2, 1:3), class = "vctrs_error_incompatible_size"))
+    (expect_error(
+      vec_recycle_common(1:2, 1:3),
+      class = "vctrs_error_incompatible_size"
+    ))
   })
-  expect_error(vec_recycle_common(1:3, 1:2), class = "vctrs_error_incompatible_size")
-  expect_error(vec_recycle_common(numeric(), 1:2), class = "vctrs_error_incompatible_size")
+  expect_error(
+    vec_recycle_common(1:3, 1:2),
+    class = "vctrs_error_incompatible_size"
+  )
+  expect_error(
+    vec_recycle_common(numeric(), 1:2),
+    class = "vctrs_error_incompatible_size"
+  )
+})
+
+test_that("vec_recycle_common errors on scalars", {
+  expect_snapshot(error = TRUE, {
+    vec_recycle_common(1, lm(1 ~ 1))
+  })
+
+  # Index is correct with `NULL`s
+  expect_snapshot(error = TRUE, {
+    vec_recycle_common(1, NULL, lm(1 ~ 1))
+  })
+})
+
+test_that("vec_recycle_common doesn't mutate the input in place", {
+  x <- list(a = 1, b = 2:3)
+
+  expect_identical(
+    vec_recycle_common(!!!x),
+    list(a = c(1, 1), b = 2:3)
+  )
+  expect_identical(
+    x,
+    list(a = 1, b = 2:3)
+  )
+})
+
+test_that("vec_recycle_common retains names", {
+  expect_named(vec_recycle_common(a = 1, b = 2), c("a", "b"))
+  expect_named(vec_recycle_common(a = 1, b = 2:3), c("a", "b"))
 })
 
 # Matrices ----------------------------------------------------------------
@@ -111,10 +181,18 @@ test_that("recycling matrices respects incompatible sizes", {
   x0 <- x[0, , drop = FALSE]
 
   expect_snapshot({
-    (expect_error(vec_recycle_common(x2, x), class = "vctrs_error_incompatible_size"))
+    (expect_error(
+      vec_recycle_common(x2, x),
+      class = "vctrs_error_incompatible_size"
+    ))
   })
-  expect_error(vec_recycle_common(x0, x), class = "vctrs_error_incompatible_size")
+  expect_error(
+    vec_recycle_common(x0, x),
+    class = "vctrs_error_incompatible_size"
+  )
 })
+
+# Data frames ------------------------------------------------------------
 
 test_that("can vec_recycle_common data frames", {
   x <- data.frame(a = rep(1, 3), b = rep(2, 3))
@@ -130,9 +208,15 @@ test_that("recycling data frames respects incompatible sizes", {
   x0 <- vec_slice(x, integer())
 
   expect_snapshot({
-    (expect_error(vec_recycle_common(x2, x), class = "vctrs_error_incompatible_size"))
+    (expect_error(
+      vec_recycle_common(x2, x),
+      class = "vctrs_error_incompatible_size"
+    ))
   })
-  expect_error(vec_recycle_common(x0, x), class = "vctrs_error_incompatible_size")
+  expect_error(
+    vec_recycle_common(x0, x),
+    class = "vctrs_error_incompatible_size"
+  )
 })
 
 test_that("can vec_recycle_common matrix and data frame", {
@@ -163,15 +247,4 @@ test_that("recycling data frames with matrices respects incompatible sizes", {
     vec_recycle_common(mt, vec_slice(df, 0L)),
     class = "vctrs_error_incompatible_size"
   )
-})
-
-test_that("recycling to size 1 has informative error", {
-  expect_snapshot({
-    (expect_error(vec_recycle(1:2, 1), class = "vctrs_error_recycle_incompatible_size"))
-  })
-})
-
-test_that("incompatible recycling size has informative error", {
-  expect_snapshot(error = TRUE, vec_recycle(1:2, 4))
-  expect_snapshot(error = TRUE, vec_recycle(1:2, 4, x_arg = "foo"))
 })

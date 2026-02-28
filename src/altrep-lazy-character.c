@@ -1,23 +1,5 @@
 #include "vctrs.h"
-#include "altrep.h"
-
-#if (!HAS_ALTREP)
-
-#include <R_ext/Rdynload.h>
-
-void vctrs_init_altrep_lazy_character(DllInfo* dll) { }
-
-r_obj* ffi_altrep_lazy_character_is_materialized(r_obj* x) {
-  r_stop_internal("Need R 3.5+ for Altrep support.");
-  return r_null;
-}
-
-r_obj* ffi_altrep_new_lazy_character(r_obj* fn) {
-  r_stop_internal("Need R 3.5+ for Altrep support.");
-  return r_null;
-}
-
-#else
+#include "R_ext/Altrep.h"
 
 // Initialised at load time
 R_altrep_class_t altrep_lazy_character_class;
@@ -58,7 +40,16 @@ r_obj* altrep_lazy_character_Materialize(r_obj* vec) {
 }
 
 void* altrep_lazy_character_Dataptr(r_obj* vec, Rboolean writeable) {
-  return STDVEC_DATAPTR(altrep_lazy_character_Materialize(vec));
+  if (writeable) {
+    r_stop_internal("Can't get writeable `DATAPTR()` to `<altrep_lazy_character>`");
+  } else {
+    // R promises not to write to this array, but we still have to return a
+    // `void*` pointer rather than a `const void*` pointer. `STRING_PTR()` is
+    // non-API so we use `STRING_PTR_RO()` and cast. This is really a bad ALTREP
+    // API. It should have been separated into `void* Dataptr()` and `const
+    // void* Dataptr_ro()`.
+    return (void*) STRING_PTR_RO(altrep_lazy_character_Materialize(vec));
+  }
 }
 
 const void* altrep_lazy_character_Dataptr_or_null(r_obj* vec) {
@@ -67,7 +58,7 @@ const void* altrep_lazy_character_Dataptr_or_null(r_obj* vec) {
   if (out == r_null) {
     return NULL;
   } else {
-    return STDVEC_DATAPTR(out);
+    return r_chr_cbegin(out);
   }
 }
 
@@ -135,5 +126,3 @@ void vctrs_init_altrep_lazy_character(DllInfo* dll) {
   R_set_altstring_Elt_method(altrep_lazy_character_class, altrep_lazy_character_Elt);
   R_set_altstring_Set_elt_method(altrep_lazy_character_class, altrep_lazy_character_Set_elt);
 }
-
-#endif // R version >= 3.5.0

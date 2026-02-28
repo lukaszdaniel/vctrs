@@ -12,7 +12,7 @@ struct counters {
   // Argument tags for the current value of the reduction (the result
   // so far) and the next value. These handles typically point to the
   // local counter args, but might also point to external arg objects
-  // like the initial current arg, or a splice box counter arg.
+  // like the initial current arg.
   struct vctrs_arg* curr_arg;
   struct vctrs_arg* next_arg;
 
@@ -23,14 +23,6 @@ struct counters {
   r_ssize next;
 
   r_obj* names;
-  r_ssize names_curr;
-  r_ssize names_next;
-
-  // Local counters for splice boxes. Since the tags are generated
-  // lazily, we need two counter states to handle the
-  // `vec_c(!!!list(foo = 1), !!!list(bar = 2))` case.
-  struct counters* next_box_counters;
-  struct counters* prev_box_counters;
 
   struct vctrs_arg curr_counter;
   struct vctrs_arg next_counter;
@@ -44,8 +36,6 @@ struct counters {
 enum counters_shelter {
   COUNTERS_SHELTER_data = 0,
   COUNTERS_SHELTER_names,
-  COUNTERS_SHELTER_next,
-  COUNTERS_SHELTER_prev,
   COUNTERS_SHELTER_N
 };
 
@@ -60,12 +50,14 @@ enum counters_shelter {
  */
 void counters_shift(struct counters* counters);
 
-r_obj* reduce(r_obj* current,
-              struct vctrs_arg* p_current_arg,
-              struct vctrs_arg* p_parent_arg,
-              r_obj* rest,
-              r_obj* (*impl)(r_obj* current, r_obj* next, struct counters* counters, void* data),
-              void* data);
+r_obj* reduce(
+  r_obj* current,
+  struct vctrs_arg* p_current_arg,
+  struct vctrs_arg* p_parent_arg,
+  r_obj* rest,
+  r_obj* (*impl)(r_obj* current, r_obj* next, struct counters* counters, void* data),
+  void* data
+);
 
 
 #endif

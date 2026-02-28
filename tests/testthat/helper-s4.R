@@ -1,4 +1,3 @@
-
 .rando <- setClass(
   "vctrs_rando",
   contains = "numeric",
@@ -44,7 +43,12 @@ local_c_counts <- function(frame = caller_env()) {
 
 local_s4_method <- function(generic, signature, method, frame = caller_env()) {
   methods::setMethod(generic, signature, method)
-  exit_expr <- call2(methods::removeMethod, generic, signature, where = topenv(frame))
+  exit_expr <- call2(
+    methods::removeMethod,
+    generic,
+    signature,
+    where = topenv(frame)
+  )
   local_exit(exit_expr, frame = frame)
 }
 with_s4_method <- function(generic, signature, method, expr) {
@@ -66,8 +70,4 @@ local_exit <- function(expr, frame = caller_env()) {
   eval_bare(expr, frame)
 
   invisible(expr)
-}
-
-skip_if_cant_set_names_on_s4 <- function() {
-  skip_if(getRversion() < "3.5.0", message = "Can't set names on S4 objects")
 }

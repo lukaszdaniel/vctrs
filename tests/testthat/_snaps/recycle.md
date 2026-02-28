@@ -36,36 +36,6 @@
       Error:
       ! Can't recycle input of size 2 to size 1.
 
-# vec_recycle_common(): incompatible lengths get error messages
-
-    Code
-      (expect_error(vec_recycle_common(1:2, 1:3), class = "vctrs_error_incompatible_size")
-      )
-    Output
-      <error/vctrs_error_incompatible_size>
-      Error:
-      ! Can't recycle `..1` (size 2) to match `..2` (size 3).
-
-# recycling matrices respects incompatible sizes
-
-    Code
-      (expect_error(vec_recycle_common(x2, x), class = "vctrs_error_incompatible_size")
-      )
-    Output
-      <error/vctrs_error_incompatible_size>
-      Error:
-      ! Can't recycle `..1` (size 2) to match `..2` (size 4).
-
-# recycling data frames respects incompatible sizes
-
-    Code
-      (expect_error(vec_recycle_common(x2, x), class = "vctrs_error_incompatible_size")
-      )
-    Output
-      <error/vctrs_error_incompatible_size>
-      Error:
-      ! Can't recycle `..1` (size 2) to match `..2` (size 3).
-
 # recycling to size 1 has informative error
 
     Code
@@ -91,4 +61,56 @@
     Condition
       Error:
       ! Can't recycle `foo` (size 2) to size 4.
+
+# vec_recycle_common(): incompatible lengths get error messages
+
+    Code
+      (expect_error(vec_recycle_common(1:2, 1:3), class = "vctrs_error_incompatible_size")
+      )
+    Output
+      <error/vctrs_error_incompatible_size>
+      Error:
+      ! Can't recycle `..1` (size 2) to match `..2` (size 3).
+
+# vec_recycle_common errors on scalars
+
+    Code
+      vec_recycle_common(1, lm(1 ~ 1))
+    Condition
+      Error:
+      ! `..2` must be a vector, not a <lm> object.
+      x Detected incompatible scalar S3 list. To be treated as a vector, the object must explicitly inherit from <list> or should implement a `vec_proxy()` method. Class: <lm>.
+      i If this object comes from a package, please report this error to the package author.
+      i Read our FAQ about creating vector types (`?vctrs::howto_faq_fix_scalar_type_error`) to learn more.
+
+---
+
+    Code
+      vec_recycle_common(1, NULL, lm(1 ~ 1))
+    Condition
+      Error:
+      ! `..3` must be a vector, not a <lm> object.
+      x Detected incompatible scalar S3 list. To be treated as a vector, the object must explicitly inherit from <list> or should implement a `vec_proxy()` method. Class: <lm>.
+      i If this object comes from a package, please report this error to the package author.
+      i Read our FAQ about creating vector types (`?vctrs::howto_faq_fix_scalar_type_error`) to learn more.
+
+# recycling matrices respects incompatible sizes
+
+    Code
+      (expect_error(vec_recycle_common(x2, x), class = "vctrs_error_incompatible_size")
+      )
+    Output
+      <error/vctrs_error_incompatible_size>
+      Error:
+      ! Can't recycle `..1` (size 2) to match `..2` (size 4).
+
+# recycling data frames respects incompatible sizes
+
+    Code
+      (expect_error(vec_recycle_common(x2, x), class = "vctrs_error_incompatible_size")
+      )
+    Output
+      <error/vctrs_error_incompatible_size>
+      Error:
+      ! Can't recycle `..1` (size 2) to match `..2` (size 3).
 

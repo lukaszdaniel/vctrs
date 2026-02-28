@@ -146,14 +146,16 @@ r_obj* vec_locate_matches(r_obj* needles,
   int n_prot = 0;
 
   int _;
-  r_obj* ptype = KEEP_N(vec_ptype2_params(
+  r_obj* ptype = KEEP_N(vec_ptype2(
     needles,
     haystack,
     needles_arg,
     haystack_arg,
     error_call,
+    S3_FALLBACK_false,
     &_
   ), &n_prot);
+  ptype = KEEP_N(vec_ptype_finalise(ptype), &n_prot);
 
   needles = KEEP_N(vec_cast_params(
     needles,
@@ -1720,7 +1722,7 @@ r_obj* expand_compact_indices(const int* v_o_haystack,
   if (track_matches_haystack) {
     r_obj* detect_matches_haystack = KEEP_N(r_alloc_raw(size_haystack * sizeof(bool)), &n_prot);
     v_detect_matches_haystack = r_raw_begin(detect_matches_haystack);
-    memset(v_detect_matches_haystack, 0, size_haystack * sizeof(bool));
+    r_memset(v_detect_matches_haystack, 0, size_haystack * sizeof(bool));
   }
 
   // For `multiple = "first" / "last"`
@@ -2262,8 +2264,7 @@ r_obj* compute_nesting_container_info(r_obj* haystack,
     chrs_asc,
     chrs_smallest,
     true,
-    r_null,
-    true
+    r_null
   ), &n_prot);
 
   r_obj* o_haystack = r_list_get(info, 0);
@@ -2324,8 +2325,7 @@ r_obj* compute_nesting_container_info(r_obj* haystack,
       chrs_asc,
       chrs_smallest,
       true,
-      r_null,
-      true
+      r_null
     );
     r_obj* outer_group_sizes = KEEP_N(r_list_get(info, 1), &n_prot);
     v_outer_group_sizes = r_int_cbegin(outer_group_sizes);
@@ -2444,7 +2444,7 @@ r_obj* compute_nesting_container_ids(r_obj* x,
 
   // Initialize ids to 0, which is always our first container id value.
   // This means we start with 1 container.
-  memset(v_container_ids, 0, size * sizeof(int));
+  r_memset(v_container_ids, 0, size * sizeof(int));
   *p_n_container_ids = 1;
 
   if (size == 0) {

@@ -1,9 +1,8 @@
 #ifndef ALTREP_RLE_H
 #define ALTREP_RLE_H
 
-#include "altrep.h"
-
-#if (HAS_ALTREP)
+#include "vctrs-core.h"
+#include "R_ext/Altrep.h"
 
 SEXP altrep_rle_Make(SEXP input);
 R_xlen_t altrep_rle_Length(SEXP vec);
@@ -21,7 +20,5 @@ const void* altrep_rle_Dataptr_or_null(SEXP vec);
 void vctrs_init_altrep_rle(DllInfo* dll);
 
 extern R_altrep_class_t altrep_rle_class;
-
-#endif
 
 #endif

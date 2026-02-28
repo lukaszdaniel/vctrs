@@ -1,6 +1,7 @@
 #include "vctrs.h"
 #include "type-data-frame.h"
-#include "altrep.h"
+
+#include "decl/slice-decl.h"
 
 #define SLICE_SUBSCRIPT(RTYPE, CTYPE, DEREF, CONST_DEREF, NA_VALUE)     \
   const CTYPE* data = CONST_DEREF(x);                                   \
@@ -57,14 +58,8 @@
 
 #define SLICE(RTYPE, CTYPE, DEREF, CONST_DEREF, NA_VALUE)               \
   if (!materialize && ALTREP(x)) {                                      \
-    r_obj* alt_subscript = KEEP(compact_materialize(subscript));        \
-    r_obj* out = ALTVEC_EXTRACT_SUBSET_PROXY(x, alt_subscript, r_null); \
-    FREE(1);                                                            \
-    if (out != NULL) {                                                  \
-      return out;                                                       \
-    }                                                                   \
-  }                                                                     \
-  if (is_compact_rep(subscript)) {                                      \
+    return vec_slice_altrep(x, subscript);                              \
+  } else if (is_compact_rep(subscript)) {                               \
     SLICE_COMPACT_REP(RTYPE, CTYPE, DEREF, CONST_DEREF, NA_VALUE);      \
   } else if (is_compact_seq(subscript)) {                               \
     SLICE_COMPACT_SEQ(RTYPE, CTYPE, DEREF, CONST_DEREF);                \
@@ -148,7 +143,9 @@ r_obj* raw_slice(r_obj* x, r_obj* subscript, enum vctrs_materialize materialize)
   return out
 
 #define SLICE_BARRIER(RTYPE, CONST_DEREF, SET, NA_VALUE)                \
-  if (is_compact_rep(subscript)) {                                      \
+  if (!materialize && ALTREP(x)) {                                      \
+    return vec_slice_altrep(x, subscript);                              \
+  } else if (is_compact_rep(subscript)) {                               \
     SLICE_BARRIER_COMPACT_REP(RTYPE, CONST_DEREF, SET, NA_VALUE);       \
   } else if (is_compact_seq(subscript)) {                               \
     SLICE_BARRIER_COMPACT_SEQ(RTYPE, CONST_DEREF, SET);                 \
@@ -165,7 +162,7 @@ r_obj* chr_names_slice(r_obj* x, r_obj* subscript, enum vctrs_materialize materi
   SLICE_BARRIER(R_TYPE_character, r_chr_cbegin, r_chr_poke, r_strs.empty);
 }
 static
-r_obj* list_slice(r_obj* x, r_obj* subscript) {
+r_obj* list_slice(r_obj* x, r_obj* subscript, enum vctrs_materialize materialize) {
   SLICE_BARRIER(R_TYPE_list, r_list_cbegin, r_list_poke, r_null);
 }
 
@@ -207,7 +204,6 @@ r_obj* df_slice(r_obj* x, r_obj* subscript) {
   return out;
 }
 
-
 r_obj* vec_slice_fallback(r_obj* x, r_obj* subscript) {
   // TODO - Remove once bit64 is updated on CRAN. Special casing integer64
   // objects to ensure correct slicing with `NA_integer_`.
@@ -237,9 +233,25 @@ r_obj* vec_slice_dispatch(r_obj* x, r_obj* subscript) {
                          syms_i, subscript);
 }
 
+r_obj* vec_slice_altrep(r_obj* x, r_obj* subscript) {
+  subscript = KEEP(vec_subscript_materialize(subscript));
+
+  r_obj* out = vctrs_dispatch2(
+    syms.vec_slice_altrep,
+    fns.vec_slice_altrep,
+    syms_x,
+    x,
+    syms_i,
+    subscript
+  );
+
+  FREE(1);
+  return out;
+}
+
 bool vec_requires_fallback(r_obj* x, struct vctrs_proxy_info info) {
   return r_is_object(x) &&
-    info.proxy_method == r_null &&
+    !info.had_proxy_method &&
     info.type != VCTRS_TYPE_dataframe;
 }
 
@@ -254,7 +266,7 @@ r_obj* vec_slice_base(enum vctrs_type type,
   case VCTRS_TYPE_complex:   return cpl_slice(x, subscript, materialize);
   case VCTRS_TYPE_character: return chr_slice(x, subscript, materialize);
   case VCTRS_TYPE_raw:       return raw_slice(x, subscript, materialize);
-  case VCTRS_TYPE_list:      return list_slice(x, subscript);
+  case VCTRS_TYPE_list:      return list_slice(x, subscript, materialize);
   default: stop_unimplemented_vctrs_type("vec_slice_base", type);
   }
 }
@@ -285,20 +297,16 @@ r_obj* vec_slice_unsafe(r_obj* x, r_obj* subscript) {
   int nprot = 0;
 
   struct vctrs_proxy_info info = vec_proxy_info(x);
-  KEEP_N(info.shelter, &nprot);
-
-  r_obj* data = info.proxy;
+  KEEP_N(info.inner, &nprot);
 
   // Fallback to `[` if the class doesn't implement a proxy. This is
   // to be maximally compatible with existing classes.
   if (vec_requires_fallback(x, info)) {
     if (info.type == VCTRS_TYPE_scalar) {
-      obj_check_vector(x, NULL, r_lazy_null);
+      obj_check_vector(x, VCTRS_ALLOW_NULL_no, NULL, r_lazy_null);
     }
 
-    if (is_compact(subscript)) {
-      subscript = KEEP_N(compact_materialize(subscript), &nprot);
-    }
+    subscript = KEEP_N(vec_subscript_materialize(subscript), &nprot);
 
     r_obj* out;
 
@@ -310,7 +318,15 @@ r_obj* vec_slice_unsafe(r_obj* x, r_obj* subscript) {
 
     // Take over attribute restoration only if there is no `[` method
     if (!vec_is_restored(out, x)) {
-      out = vec_restore(out, x, vec_owned(out));
+      // Sliced `out` comes from R, so is foreign. Technically not proxied at all,
+      // so "restoring" is a bit of a hack, but we only restore if it looks like the
+      // `[` result is missing attributes.
+      struct vec_restore_opts restore_opts = {
+        .ownership = VCTRS_OWNERSHIP_foreign,
+        .recursively_proxied = false
+      };
+
+      out = vec_restore_opts(out, x, &restore_opts);
     }
 
     FREE(nprot);
@@ -331,7 +347,7 @@ r_obj* vec_slice_unsafe(r_obj* x, r_obj* subscript) {
     r_obj* out;
 
     if (has_dim(x)) {
-      out = KEEP_N(vec_slice_shaped(info.type, data, subscript), &nprot);
+      out = KEEP_N(vec_slice_shaped(info.type, info.inner, subscript), &nprot);
 
       r_obj* names = KEEP_N(r_attrib_get(x, r_syms.dim_names), &nprot);
       if (names != r_null) {
@@ -342,22 +358,43 @@ r_obj* vec_slice_unsafe(r_obj* x, r_obj* subscript) {
         r_attrib_poke(out, r_syms.dim_names, names);
       }
     } else {
-      out = KEEP_N(vec_slice_base(info.type, data, subscript, VCTRS_MATERIALIZE_false), &nprot);
+      out = KEEP_N(vec_slice_base(info.type, info.inner, subscript, VCTRS_MATERIALIZE_false), &nprot);
 
       r_obj* names = KEEP_N(r_names(x), &nprot);
       names = KEEP_N(slice_names(names, subscript), &nprot);
       r_attrib_poke_names(out, names);
     }
 
-    out = vec_restore(out, x, vec_owned(out));
+    // Sliced `out` is a fresh object from `vec_slice_base()` or
+    // `vec_slice_shaped()` that we control (and we even modify names directly
+    // above). For atomics, shallow and deep ownership are the same. We mark as
+    // shallow just for consistency with the data frame path.
+    struct vec_restore_opts restore_opts = {
+      .ownership = VCTRS_OWNERSHIP_shallow,
+      .recursively_proxied = false
+    };
+
+    out = vec_restore_opts(out, x, &restore_opts);
 
     FREE(nprot);
     return out;
   }
 
   case VCTRS_TYPE_dataframe: {
-    r_obj* out = KEEP_N(df_slice(data, subscript), &nprot);
-    out = vec_restore(out, x, vec_owned(out));
+    r_obj* out = KEEP_N(df_slice(info.inner, subscript), &nprot);
+
+    // Sliced `out` is a fresh list container from `df_slice()`, but we don't
+    // necessarily own the sliced columns (an individual column could have gone
+    // through the fallback path) so we set shallow ownership. This is fine, we
+    // don't restore recursively here, so only the list container will need to
+    // be modified during restoration.
+    struct vec_restore_opts restore_opts = {
+      .ownership = VCTRS_OWNERSHIP_shallow,
+      .recursively_proxied = false
+    };
+
+    out = vec_restore_opts(out, x, &restore_opts);
+
     FREE(nprot);
     return out;
   }
@@ -409,7 +446,7 @@ r_obj* ffi_slice(r_obj* x,
 r_obj* vec_slice_opts(r_obj* x,
                       r_obj* i,
                       const struct vec_slice_opts* opts) {
-  obj_check_vector(x, opts->x_arg, opts->call);
+  obj_check_vector(x, VCTRS_ALLOW_NULL_no, opts->x_arg, opts->call);
 
   r_obj* names = KEEP(vec_names(x));
   i = KEEP(vec_as_location_ctxt(i,
@@ -424,8 +461,21 @@ r_obj* vec_slice_opts(r_obj* x,
   return out;
 }
 
+// Reverse a vector
+r_obj* vec_reverse(r_obj* x) {
+  const r_ssize size = vec_size(x);
+  const r_ssize start = (size == 0) ? 0 : size - 1;
+  const bool increasing = false;
+  r_obj* index = KEEP(compact_seq(start, size, increasing));
+
+  r_obj* out = vec_slice_unsafe(x, index);
+
+  FREE(1);
+  return out;
+}
+
 r_obj* vec_init(r_obj* x, r_ssize n) {
-  obj_check_vector(x, vec_args.x, lazy_calls.vec_init);
+  obj_check_vector(x, VCTRS_ALLOW_NULL_no, vec_args.x, lazy_calls.vec_init);
 
   if (n < 0) {
     r_abort_lazy_call(lazy_calls.vec_init,
@@ -482,10 +532,12 @@ r_obj* ffi_slice_rep(r_obj* x, r_obj* ffi_i, r_obj* ffi_n) {
 
 
 void vctrs_init_slice(r_obj* ns) {
+  syms.vec_slice_altrep = r_sym("vec_slice_altrep");
   syms.vec_slice_dispatch_integer64 = r_sym("vec_slice_dispatch_integer64");
   syms.vec_slice_fallback = r_sym("vec_slice_fallback");
   syms.vec_slice_fallback_integer64 = r_sym("vec_slice_fallback_integer64");
 
+  fns.vec_slice_altrep = r_eval(syms.vec_slice_altrep, ns);
   fns.vec_slice_dispatch_integer64 = r_eval(syms.vec_slice_dispatch_integer64, ns);
   fns.vec_slice_fallback = r_eval(syms.vec_slice_fallback, ns);
   fns.vec_slice_fallback_integer64 = r_eval(syms.vec_slice_fallback_integer64, ns);
